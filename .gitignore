@@ -1,0 +1,6 @@
+StellaSnow.app/
+build/
+.DS_Store
+xcuserdata/
+*.xcuserstate
+DerivedData/

@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Stella's Snow</title>
+<style>
+  :root { --ink: #1f2f52; --muted: #6b7a96; --accent: #3b6fc4; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #16244e; overscroll-behavior: none; }
+  body { font: 13px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif; color: var(--ink);
+         -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  #bg { position: fixed; inset: 0; background: url("Wallpaper.jpg") center / cover no-repeat, linear-gradient(#1b2d63, #4a78c4); }
+  #house { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: opacity .6s; }
+  body.still #house { opacity: 0; }
+  #plain { position: fixed; inset: 0; background: radial-gradient(120% 90% at 70% 10%, #5f88cf 0%, #2a4485 55%, #142252 100%);
+           opacity: 0; transition: opacity .6s; }
+  body.no-cabin #plain { opacity: 1; }
+  canvas { position: fixed; inset: 0; touch-action: none; }
+  #menubar { position: fixed; top: 0; left: 0; right: 0; height: 26px; display: flex; align-items: center; gap: 16px;
+             padding: 0 12px; background: rgba(20, 30, 60, .28); -webkit-backdrop-filter: blur(18px) saturate(1.4);
+             backdrop-filter: blur(18px) saturate(1.4); color: #fff; font-weight: 600; font-size: 13px; z-index: 5;
+             padding-top: env(safe-area-inset-top); height: calc(26px + env(safe-area-inset-top)); }
+  #menubar .spacer { flex: 1; }
+  #menubar .dim { font-weight: 500; opacity: .9; }
+  #flakeBtn { all: unset; cursor: pointer; display: grid; place-items: center; width: 30px; height: 22px; border-radius: 5px; }
+  #flakeBtn:hover, #flakeBtn.on { background: rgba(255,255,255,.22); }
+  #flakeBtn svg { width: 15px; height: 15px; }
+  #panel { position: fixed; top: calc(32px + env(safe-area-inset-top)); right: 8px; width: 300px; max-height: calc(100% - 44px);
+           overflow: auto; z-index: 6; padding: 16px; border-radius: 14px; background: rgba(246, 248, 253, .9);
+           -webkit-backdrop-filter: blur(28px) saturate(1.6); backdrop-filter: blur(28px) saturate(1.6);
+           box-shadow: 0 18px 50px rgba(10, 20, 50, .35), 0 0 0 .5px rgba(0,0,0,.15);
+           transform-origin: top right; transition: opacity .16s, transform .16s; }
+  #panel[hidden] { display: block; opacity: 0; transform: scale(.96); pointer-events: none; }
+  .hdr { display: flex; align-items: center; gap: 11px; margin-bottom: 14px; }
+  .badge { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center;
+           background: linear-gradient(45deg, #24408c, #5c9ef0); }
+  .badge svg { width: 18px; height: 18px; }
+  .ttl { font: 700 16px ui-rounded, "SF Pro Rounded", -apple-system, sans-serif; }
+  .sub { font-size: 11px; color: var(--muted); }
+  .sec { margin: 14px 0 8px; font-size: 10px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; color: var(--muted); }
+  .row { display: flex; align-items: center; gap: 8px; min-height: 26px; }
+  .row .note { margin-left: auto; font-size: 11px; color: var(--muted); }
+  input[type=range] { width: 100%; margin: 2px 0 6px; accent-color: var(--accent); }
+  .sw { margin-left: auto; position: relative; width: 30px; height: 18px; flex: none; }
+  .sw input { opacity: 0; width: 100%; height: 100%; margin: 0; position: absolute; cursor: pointer; z-index: 1; }
+  .sw span { position: absolute; inset: 0; border-radius: 9px; background: #c9cfdb; transition: background .15s; }
+  .sw span::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%;
+                    background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .15s; }
+  .sw input:checked + span { background: var(--accent); }
+  .sw input:checked + span::after { transform: translateX(12px); }
+  .btns { display: flex; gap: 8px; margin: 4px 0; }
+  .btn { flex: 1; appearance: none; border: 0; border-radius: 7px; padding: 6px 10px; font: 500 12px -apple-system, sans-serif;
+         color: var(--ink); background: rgba(30, 50, 100, .09); cursor: pointer; }
+  .btn:hover { background: rgba(30, 50, 100, .15); }
+  .btn.small { flex: none; padding: 3px 9px; font-size: 11px; }
+  .btn:disabled { opacity: .4; }
+  .name { width: 110px; margin-left: auto; padding: 3px 7px; border: 1px solid #c5ccda; border-radius: 6px; font: inherit; color: inherit; background: #fff; }
+  details { margin-top: 12px; }
+  summary { cursor: pointer; color: var(--ink); font-size: 12px; }
+  details ul { margin: 6px 0 0; padding-left: 16px; color: var(--muted); font-size: 11.5px; }
+  details li { margin: 3px 0; }
+  .foot { display: flex; justify-content: space-between; margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(0,0,0,.08); }
+  .hint { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 4; padding: 8px 14px; border-radius: 20px;
+          max-width: min(92vw, 440px); text-align: center;
+          background: rgba(15, 25, 55, .55); color: #fff; font-size: 12.5px; pointer-events: none;
+          -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); transition: opacity 1s; }
+</style>
+</head>
+<body>
+<div id="bg"></div><video id="house" src="HouseLoop.mp4" poster="Wallpaper.jpg" autoplay muted loop playsinline></video><div id="plain"></div>
+<canvas id="c"></canvas>
+
+<div id="menubar">
+  <span>Stella's Snow</span><span class="dim" id="menuWord">Snow Day</span>
+  <span class="spacer"></span>
+  <span class="dim" id="clock"></span>
+  <button id="flakeBtn" aria-label="Snow settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M12 2v20M3.3 7l17.4 10M3.3 17L20.7 7M12 2l-3 3M12 2l3 3M12 22l-3-3M12 22l3-3"/></svg>
+  </button>
+</div>
+
+<div id="panel" hidden>
+  <div class="hdr">
+    <div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M12 2v20M3.3 7l17.4 10M3.3 17L20.7 7"/></svg></div>
+    <div><div class="ttl" id="title">Stella's Snow</div><div class="sub" id="status">Steady snow</div></div>
+    <span style="flex:1"></span>
+    <button class="btn small" id="pauseTop">Pause</button>
+  </div>
+
+  <div class="sec">Weather</div>
+  <div class="row">Snowfall <span class="note" id="nSnow"></span></div>
+  <input type="range" id="snowfall" min="0" max="600" step="10">
+  <div class="row">Wind <span class="note" id="nWind"></span></div>
+  <input type="range" id="wind" min="0" max="2.5" step="0.05">
+  <div class="row">Flake size <span class="note" id="nSize"></span></div>
+  <input type="range" id="flakeSize" min="0.6" max="1.8" step="0.05">
+  <div class="btns"><button class="btn" id="blizzard">Let it snow!</button></div>
+
+  <div class="sec">Play</div>
+  <div class="btns"><button class="btn" id="ball">Snowball</button><button class="btn" id="plough">Snowplough</button></div>
+  <div class="row">Tap the sky to throw <label class="sw"><input type="checkbox" id="clickSnowballs"><span></span></label></div>
+
+  <div class="sec">Friends</div>
+  <div class="row">Snowman <label class="sw"><input type="checkbox" id="showSnowman"><span></span></label></div>
+  <div class="row">Yeti visits <button class="btn small" id="callYeti" style="margin-left:auto">Call him</button>
+    <label class="sw" style="margin-left:6px"><input type="checkbox" id="yetiEnabled"><span></span></label></div>
+
+  <div class="sec">Desktop</div>
+  <div class="row">Animated house <label class="sw"><input type="checkbox" id="animated"><span></span></label></div>
+  <div class="row">House background <label class="sw"><input type="checkbox" id="cabin"><span></span></label></div>
+  <div class="row">Pretend windows <button class="btn small" id="newWin" style="margin-left:auto">Open one</button></div>
+  <div class="row">Snowman says hi to <input class="name" id="name" maxlength="16"></div>
+
+  <details>
+    <summary>How to play</summary>
+    <ul>
+      <li>Press the snow at the bottom and drag to roll a snowball. It grows where there's snow.</li>
+      <li>Drop one snowball on another to stack. Three makes a snowman, and he stays.</li>
+      <li>Drag a snowman off the edge of the screen to say goodbye.</li>
+      <li>Tap the snowman to say hi. Tap him three times fast.</li>
+      <li>Snow piles on the windows. Drag one, or close it, and watch.</li>
+      <li>Tap the yeti to get him back. Tap a splat to wipe it off.</li>
+    </ul>
+  </details>
+  <div class="foot"><button class="btn small" id="pause">Pause</button><span class="sub">Made for Stella</span></div>
+</div>
+<div class="hint" id="hint">Tap the sky to throw a snowball. Drag along the snow to roll one.</div>
+
+<script>
+"use strict";
+// ---------------------------------------------------------------------------
+// Stella's Snow, web version. Same design as the Mac app: three depths of
+// snow, drifts on the ground and on windows, a snowman who comes apart,
+// a sneaky yeti, snowball play and a plough. World coordinates are y-up
+// (like SpriteKit), so the logic matches the Swift code line for line.
+// ---------------------------------------------------------------------------
+const cvs = document.getElementById("c"), ctx = cvs.getContext("2d");
+let W = 0, H = 0, DPR = 1, UI = 1, TOP = 26;
+const TAU = Math.PI * 2;
+const rnd = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
+const lerp = (a, b, t) => a + (b - a) * t;
+const easeInOut = t => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+const pick = a => a[Math.floor(Math.random() * a.length)];
+
+// ---------- settings (saved) ----------
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("snow." + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem("snow." + k, JSON.stringify(v)); } catch (e) {} },
+};
+const S = {
+  name: store.get("name", "Stella"), snowfall: store.get("snowfall", 260), wind: store.get("wind", 1),
+  flakeSize: store.get("flakeSize", 1), showSnowman: store.get("showSnowman", true), yetiEnabled: store.get("yetiEnabled", true),
+  clickSnowballs: store.get("clickSnowballs", true), cabin: store.get("cabin", true), animated: store.get("animated", true), paused: false,
+};
+const displayName = () => (S.name || "").trim();
+
+// ---------- textures, painted once ----------
+function paint(w, h, fn) { const c = document.createElement("canvas"); c.width = w; c.height = h; fn(c.getContext("2d"), w, h); return c; }
+function radial(g, x, y, r, stops) { const gr = g.createRadialGradient(x, y, 0, x, y, r); stops.forEach(([o, c]) => gr.addColorStop(o, c)); return gr; }
+function seeded(seed) { let s = seed * 2654435761 % 4294967296; return () => (s = (s * 1664525 + 1013904223) % 4294967296) / 4294967296; }
+
+const T = {};
+T.dot = paint(32, 32, g => { g.fillStyle = radial(g, 16, 16, 16, [[0, "rgba(255,255,255,1)"], [.38, "rgba(255,255,255,.85)"], [1, "rgba(255,255,255,0)"]]); g.fillRect(0, 0, 32, 32); });
+T.bokeh = paint(64, 64, g => { g.fillStyle = radial(g, 32, 32, 32, [[0, "rgba(255,255,255,.2)"], [.68, "rgba(255,255,255,.28)"], [.88, "rgba(255,255,255,.45)"], [1, "rgba(255,255,255,0)"]]); g.fillRect(0, 0, 64, 64); });
+T.crystal = paint(64, 64, g => {
+  g.translate(32, 32); g.strokeStyle = "#fff"; g.lineCap = "round"; g.shadowColor = "rgba(255,255,255,.9)"; g.shadowBlur = 3;
+  for (let k = 0; k < 6; k++) {
+    const a = k * Math.PI / 3 + Math.PI / 6, dx = Math.cos(a), dy = Math.sin(a);
+    g.lineWidth = 2.6; g.beginPath(); g.moveTo(0, 0); g.lineTo(dx * 27, dy * 27); g.stroke();
+    g.lineWidth = 2;
+    for (const [d, len] of [[11, 7], [19, 5]]) for (const sd of [-1, 1]) {
+      const b = a + sd * Math.PI / 3.2; g.beginPath(); g.moveTo(dx * d, dy * d); g.lineTo(dx * d + Math.cos(b) * len, dy * d + Math.sin(b) * len); g.stroke();
+    }
+  }
+});
+T.snowball = paint(128, 128, g => {
+  g.save(); g.beginPath(); g.arc(64, 64, 61, 0, TAU); g.clip();
+  g.fillStyle = radial(g, 48, 44, 104, [[0, "#fff"], [.42, "#f7f9ff"], [1, "#c7d9f2"]]); g.fillRect(0, 0, 128, 128);
+  g.fillStyle = radial(g, 78, 144, 64, [[0, "rgba(235,242,255,.55)"], [1, "rgba(235,242,255,0)"]]); g.fillRect(0, 0, 128, 128);
+  const r = seeded(7); for (let i = 0; i < 260; i++) { const s = .8 + r() * 1.6; g.fillStyle = `rgba(140,168,214,${.05 + r() * .08})`; g.fillRect(r() * 128, r() * 128, s, s); }
+  g.restore(); g.strokeStyle = "rgba(140,166,212,.55)"; g.lineWidth = 2.5; g.beginPath(); g.arc(64, 64, 60, 0, TAU); g.stroke();
+});
+T.fluff = paint(128, 128, g => {
+  const p = new Path2D(); for (let i = 0; i <= 96; i++) { const a = i / 96 * TAU, rr = 55 + 4.5 * Math.sin(a * 11) + 2.2 * Math.sin(a * 7 + 1.3); i ? p.lineTo(64 + Math.cos(a) * rr, 64 + Math.sin(a) * rr) : p.moveTo(64 + Math.cos(a) * rr, 64 + Math.sin(a) * rr); }
+  p.closePath(); g.save(); g.clip(p);
+  g.fillStyle = radial(g, 50, 46, 92, [[0, "#fff"], [.5, "#f5f8ff"], [1, "#c9d9f2"]]); g.fillRect(0, 0, 128, 128);
+  const r = seeded(31); g.lineCap = "round";
+  for (let i = 0; i < 70; i++) { const a = r() * TAU, d = 14 + r() * 36, x = 64 + Math.cos(a) * d, y = 64 + Math.sin(a) * d; g.strokeStyle = `rgba(158,181,222,${.1 + r() * .12})`; g.lineWidth = 1.2 + r(); g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * 7, y + Math.sin(a) * 7); g.stroke(); }
+  g.restore(); g.strokeStyle = "rgba(153,176,219,.5)"; g.lineWidth = 2.4; g.stroke(p);
+});
+T.splats = [0, 1, 2].map(v => paint(256, 256, g => {
+  const r = seeded(v * 97 + 13), cx = 128, cy = 116, p = new Path2D();
+  const circ = (x, y, rr) => { p.moveTo(x + rr, y); p.arc(x, y, rr, 0, TAU); };
+  circ(cx, cy, 52);
+  const lobes = 9 + Math.floor(r() * 4); for (let i = 0; i < lobes; i++) { const a = i / lobes * TAU + r() * .5, d = 40 + r() * 34; circ(cx + Math.cos(a) * d, cy + Math.sin(a) * d, 13 + r() * 17); }
+  for (let i = 0; i < 8; i++) { const a = r() * TAU, d = 88 + r() * 26; circ(cx + Math.cos(a) * d, cy + Math.sin(a) * d, 3 + r() * 5); }
+  const drips = 2 + Math.floor(r() * 2); for (let i = 0; i < drips; i++) { const x = cx - 36 + r() * 72, w = 9 + r() * 6, len = 34 + r() * 36; p.roundRect ? p.roundRect(x - w / 2, cy + 10, w, len + 30, w / 2) : p.rect(x - w / 2, cy + 10, w, len + 30); circ(x, cy + 40 + len - w * .35, w * .72); }
+  g.shadowColor = "rgba(51,77,128,.45)"; g.shadowBlur = 7; g.shadowOffsetY = 3; g.fillStyle = "#fff"; g.fill(p);
+  g.shadowColor = "transparent"; g.save(); g.clip(p);
+  g.fillStyle = radial(g, cx, cy, 140, [[0, "#fff"], [.5, "#f2f7ff"], [1, "#ccdef7"]]); g.fillRect(0, 0, 256, 256);
+  const q = seeded(v + 3); for (let i = 0; i < 500; i++) { const s = 1 + q() * 2; g.fillStyle = `rgba(140,168,217,${.05 + q() * .07})`; g.fillRect(20 + q() * 216, 20 + q() * 216, s, s); }
+  g.fillStyle = radial(g, cx - 18, cy - 20, 26, [[0, "rgba(255,255,255,.9)"], [1, "rgba(255,255,255,0)"]]); g.fillRect(0, 0, 256, 256);
+  g.restore();
+}));
+T.shadow = paint(128, 40, g => { g.translate(64, 20); g.scale(1, .3125); g.fillStyle = radial(g, 0, 0, 64, [[0, "rgba(56,82,133,.38)"], [1, "rgba(56,82,133,0)"]]); g.fillRect(-64, -64, 128, 128); });
+T.foot = paint(32, 20, g => { g.translate(16, 10); g.scale(1, .62); g.fillStyle = radial(g, 0, 0, 16, [[0, "rgba(128,158,209,.55)"], [.6, "rgba(128,158,209,.35)"], [1, "rgba(128,158,209,0)"]]); g.fillRect(-16, -16, 32, 32); });
+T.sparkle = paint(48, 48, g => { g.fillStyle = radial(g, 24, 24, 10, [[0, "rgba(255,255,255,.9)"], [1, "rgba(255,255,255,0)"]]); g.fillRect(0, 0, 48, 48); g.fillStyle = "#fff"; g.beginPath(); g.ellipse(24, 24, 1.5, 22, 0, 0, TAU); g.ellipse(24, 24, 22, 1.5, 0, 0, TAU); g.fill(); });
+const tinted = (tex, color) => paint(tex.width, tex.height, g => { g.drawImage(tex, 0, 0); g.globalCompositeOperation = "source-atop"; g.fillStyle = color; g.globalAlpha = .55; g.fillRect(0, 0, tex.width, tex.height); });
+
+// Draw a picture upright in the y-up world.
+function sprite(img, x, y, w, h, rot = 0, alpha = 1) {
+  ctx.save(); ctx.globalAlpha *= alpha; ctx.translate(x, y); if (rot) ctx.rotate(rot); ctx.scale(1, -1); ctx.drawImage(img, -w / 2, -h / 2, w, h); ctx.restore();
+}
+const circle = (x, y, r, color) => { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); };
+const ellipse = (x, y, rx, ry, color, rot = 0) => { ctx.fillStyle = color; ctx.beginPath(); ctx.ellipse(x, y, rx, ry, rot, 0, TAU); ctx.fill(); };
+function rrect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+function text(str, x, y, font, color, align = "center") { ctx.save(); ctx.translate(x, y); ctx.scale(1, -1); ctx.font = font; ctx.fillStyle = color; ctx.textAlign = align; ctx.textBaseline = "middle"; ctx.fillText(str, 0, 0); ctx.restore(); }
+
+const PAL = {
+  scarves: ["#d9293d", "#0d9ea8", "#8c54d4", "#f773a3", "#fabb29", "#33a15c", "#3b7ae6"],
+  coal: "#1a1a24", hat: "#21212e", stick: "#664529", carrot: "#f7841f", carrotDark: "#cc5c0f", cheek: "rgba(250,140,158,.5)",
+  skin: "#b3ccf0", skinDark: "#85a1d1", yetiScarf: "#3b7ae6", ink: "#21335c", rim: "rgba(153,179,222,.75)",
+};
+const mix = (hex, w, t) => { const n = parseInt(hex.slice(1), 16), c = [n >> 16, n >> 8 & 255, n & 255], o = w === "white" ? 255 : 0; return `rgb(${c.map(v => Math.round(v + (o - v) * t)).join(",")})`; };
+
+// ---------- world state ----------
+const COL = 6;
+let drift = [], clock = 0, wind = 0, gust = 0, gustTarget = 0, gustTimer = 4, blizzardT = 0, greetIn = 2.2;
+let layers = [[], [], []], particles = [], clumps = [], throwsInFlight = [], splats = [], bubbles = [], footprints = [], sparkles = [];
+let stacks = [], built = [], drag = null, plough = null, ploughFront = 0, sprayClock = 0;
+const pointer = { x: -999, y: -999, vx: 0, vy: 0, moved: -10 };
+const SPECS = [
+  { share: .42, rLo: .7, rHi: 1.5, tb: 14, tr: 10, aLo: .30, aHi: .55, windMul: .45, swLo: 4, swHi: 10 },
+  { share: .48, rLo: 1.5, rHi: 3.4, tb: 22, tr: 11, aLo: .72, aHi: .95, windMul: 1, swLo: 8, swHi: 22 },
+  { share: .10, rLo: 5, rHi: 11, tb: 64, tr: 7, aLo: .20, aHi: .40, windMul: 1.7, swLo: 14, swHi: 30 },
+];
+
+// Pretend windows and Dock. Snow piles on their tops like on real ones.
+let windows = [], dock = null, nextWinId = 1;
+const WIN_TEMPLATES = [
+  { title: "Notes", lines: ["Snow day list", "1. Build a snowman", "2. Hot cocoa", "3. Snowball fight with the yeti"] },
+  { title: "Weather", lines: ["Tonight", "Snowing on the desktop", "100% chance of snowballs"] },
+];
+
+function driftAt(x) {
+  if (drift.length < 2) return 0;
+  const fx = clamp(x / COL, 0, drift.length - 1), i = Math.floor(fx), j = Math.min(i + 1, drift.length - 1);
+  return lerp(drift[i], drift[j], fx - i);
+}
+const groundUnder = (x, half) => (driftAt(x - half) + driftAt(x) * 2 + driftAt(x + half)) / 4 * .8;
+function consumeDrift(x, radius, amount) { const a = Math.max(0, Math.floor((x - radius) / COL)), b = Math.min(drift.length - 1, Math.floor((x + radius) / COL)); for (let c = a; c <= b; c++) drift[c] = Math.max(0, drift[c] - amount); }
+function addSnow(x, radius, amount) { const a = Math.max(0, Math.floor((x - radius) / COL)), b = Math.min(drift.length - 1, Math.floor((x + radius) / COL)); for (let c = a; c <= b; c++) { const d = Math.abs(c * COL - x) / Math.max(radius, 1); drift[c] = Math.min(64, drift[c] + amount * Math.max(0, 1 - d * d)); } }
+
+function resize() {
+  DPR = Math.min(2, window.devicePixelRatio || 1); W = innerWidth; H = innerHeight;
+  cvs.width = Math.round(W * DPR); cvs.height = Math.round(H * DPR); cvs.style.width = W + "px"; cvs.style.height = H + "px";
+  UI = clamp(Math.min(W / 1400, H / 850), .55, 1);
+  TOP = document.getElementById("menubar").getBoundingClientRect().height;
+  const n = Math.ceil(W / COL) + 2;
+  if (!drift.length) { const a = rnd(0, 6), b = rnd(0, 6); drift = Array.from({ length: n }, (_, i) => Math.max(5, 15 + 6 * Math.sin(i * .045 + a) + 4 * Math.sin(i * .13 + b) + rnd(0, 1.5))); }
+  else { const old = drift; drift = Array.from({ length: n }, (_, i) => old[Math.min(old.length - 1, Math.floor(i * (old.length - 1) / Math.max(1, n - 1)))]); }
+  dock = W >= 700 ? (() => { const w = Math.min(520, W * .5), h = 62 * UI; return { minX: W / 2 - w / 2, maxX: W / 2 + w / 2, h, heights: dock && dock.heights || [] }; })() : null;
+  if (dock) resampleLedge(dock);
+  if (!windows.length) openWindow(), (W >= 700 && openWindow());
+  for (const w of windows) { w.x = clamp(w.x, -w.w + 80, W - 80); w.y = clamp(w.y, 90 * UI, H - TOP - w.h - 6); resampleLedge(w); }
+  if (snowman) { snowman.scale = UI; snowman.x = homeX(); }
+  if (yeti) yeti.scale = UI;
+}
+function resampleLedge(l) {
+  const minX = l.minX !== undefined ? l.minX : l.x, maxX = l.maxX !== undefined ? l.maxX : l.x + l.w;
+  const n = Math.max(2, Math.ceil((maxX - minX) / COL)), old = l.heights || [];
+  l.heights = Array.from({ length: n }, (_, i) => old.length ? old[Math.min(old.length - 1, Math.floor(i * (old.length - 1) / Math.max(1, n - 1)))] : 0);
+}
+function openWindow() {
+  const t = WIN_TEMPLATES[(nextWinId - 1) % WIN_TEMPLATES.length];
+  const w = Math.round(clamp(W * .22, 220, 320)), h = Math.round(clamp(H * .19, 130, 170));
+  const k = windows.filter(x => x.open).length;
+  const win = { id: nextWinId++, title: t.title, lines: t.lines, w, h, open: true,
+    x: clamp(W * (k % 2 ? .70 : .06) + rnd(-20, 20), 8, W - w - 8), y: clamp(H * (k % 2 ? .62 : .66) + rnd(-20, 20), 120 * UI, H - TOP - h - 10), heights: [] };
+  resampleLedge(win); windows.push(win); return win;
+}
+const winTop = w => w.y + w.h;
+function ledges() {
+  const out = [];
+  for (const w of windows) if (w.open) out.push({ ref: w, minX: w.x, maxX: w.x + w.w, topY: winTop(w) });
+  if (dock) out.push({ ref: dock, minX: dock.minX, maxX: dock.maxX, topY: dock.h + 6 });
+  return out;
+}
+function ledgeHit(prevY, newY, x) {
+  let best = null;
+  for (const l of ledges()) if (x >= l.minX && x <= l.maxX && newY <= l.topY && l.topY <= prevY && (!best || l.topY > best.topY)) best = l;
+  return best;
+}
+function addToLedge(l, x, amount) {
+  const h = l.ref.heights, c = clamp(Math.floor((x - l.minX) / COL), 0, h.length - 1);
+  h[c] = Math.min(28, h[c] + amount); if (c > 0) h[c - 1] = Math.min(28, h[c - 1] + amount * .4); if (c < h.length - 1) h[c + 1] = Math.min(28, h[c + 1] + amount * .4);
+}
+function shed(minX, maxX, topY, heights, fraction) {
+  if (heights.reduce((a, b) => a + b, 0) < 3) return;
+  let x = minX + 6, made = 0;
+  while (x < maxX - 4 && made < 36) {
+    const c = clamp(Math.floor((x - minX) / COL), 0, heights.length - 1), h = heights[c] * fraction;
+    if (h > 1.2) { dropClump(x, topY + h * .5, clamp(2 + h * .45, 2.5, 10), rnd(-35, 35), rnd(-10, 50)); made++; }
+    x += rnd(11, 18);
+  }
+}
+
+// ---------- flakes ----------
+function configure(f, layer, anywhere) {
+  const sp = SPECS[layer], m = S.flakeSize, r = rnd(sp.rLo, sp.rHi) * (layer === 0 ? .7 + .3 * m : m) * (UI < .8 ? .85 : 1);
+  let draw = r * 1.6;
+  if (layer === 2) { f.tex = T.bokeh; draw = r * 2; } else if (layer === 1 && r > 2.4 && Math.random() < .2) { f.tex = T.crystal; draw = r * 2.7; } else f.tex = T.dot;
+  Object.assign(f, { size: draw, r, term: (sp.tb + r * sp.tr) * rnd(.85, 1.15), phase: rnd(0, TAU), swayF: rnd(.4, 1.6), swayA: rnd(sp.swLo, sp.swHi),
+    spin: rnd(-1.2, 1.2), rot: rnd(0, TAU), alpha: rnd(sp.aLo, sp.aHi), vx: 0, vy: 0, x: rnd(0, W), y: anywhere ? rnd(0, H) : H + rnd(4, 60) });
+  f.vy = -f.term;
+}
+let seeded0 = false;
+const blizzardAmount = () => blizzardT <= 0 ? 0 : Math.min(clamp((24 - blizzardT) / 3, 0, 1), clamp(blizzardT / 5, 0, 1));
+function syncFlakes() {
+  const total = S.snowfall * (W < 700 ? .55 : 1) * (1 + 1.6 * blizzardAmount());
+  for (let L = 0; L < 3; L++) {
+    const target = Math.floor(total * SPECS[L].share), arr = layers[L];
+    while (arr.length < target) { const f = {}; configure(f, L, !seeded0); arr.push(f); }
+    if (arr.length > target) arr.length = target;
+  }
+  seeded0 = true;
+}
+function updateFlakes(dt) {
+  const pushOn = clock - pointer.moved < .4, ps = Math.hypot(pointer.vx, pointer.vy), damp = Math.max(0, 1 - 1.6 * dt);
+  for (let L = 0; L < 3; L++) {
+    const sp = SPECS[L];
+    for (const f of layers[L]) {
+      const prevY = f.y;
+      f.vy += (-f.term - f.vy) * Math.min(1, 2.2 * dt); f.y += f.vy * dt;
+      f.x += (wind * sp.windMul + Math.sin(clock * f.swayF + f.phase) * f.swayA + f.vx) * dt; f.vx *= damp; f.rot += f.spin * dt;
+      if (L > 0 && pushOn && ps > 40) {
+        const dx = f.x - pointer.x, dy = f.y - pointer.y, d2 = dx * dx + dy * dy;
+        if (d2 < 130 * 130 && d2 > 1) { const d = Math.sqrt(d2), push = (1 - d / 130) * Math.min(1, ps / 700) * 320; f.vx += dx / d * push * dt * 6; f.vy += dy / d * push * dt * 2; }
+      }
+      if (f.x < -14) f.x = W + 12; if (f.x > W + 14) f.x = -12;
+      if (L === 1) {
+        const l = ledgeHit(prevY, f.y, f.x);
+        if (l) { addToLedge(l, f.x, f.r * .8); configure(f, 1, false); }
+        else if (f.y <= driftAt(f.x)) { addSnow(f.x, COL * 1.6, f.r * .22); configure(f, 1, false); }
+      } else if (L === 0) { if (f.y < driftAt(f.x) - 2) configure(f, 0, false); }
+      else if (f.y < -30) configure(f, 2, false);
+    }
+  }
+}
+function burst(x, y, count, spread, z = 0) {
+  for (let i = 0; i < count && particles.length < 600; i++) {
+    const r = rnd(1.3, 3.4), a = rnd(0, TAU), sp = rnd(20, Math.max(21, spread)), life = rnd(.6, 1.2);
+    particles.push({ x, y, size: r * 3.2, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp + 40, life, max: life, z, g: 420 });
+  }
+}
+function dropClump(x, y, r, vx, vy) { if (clumps.length < 160) clumps.push({ x, y, r, vx, vy, rot: 0, spin: rnd(-6, 6) }); }
+
+// ---------- snowballs and splats ----------
+function throwIntoScene(tx, ty) {
+  const sx = clamp(tx * .7 + W * .15 + rnd(-40, 40), 0, W), sy = -50, dist = Math.hypot(tx - sx, ty - sy);
+  throwsInFlight.push({ p0: [sx, sy], p1: [(sx + tx) / 2, Math.max(sy, ty) + 120 + dist * .22], p2: [tx, ty], u: 0, dur: .42, s0: 2.6, s1: .55, glass: false, size: 24, rot: 0 });
+}
+function throwAtGlass(fx, fy) {
+  const tx = rnd(W * .12, W * .88), ty = rnd(H * .32, H * .78);
+  throwsInFlight.push({ p0: [fx, fy], p1: [(fx + tx) / 2, Math.max(fy, ty) + 200], p2: [tx, ty], u: 0, dur: .6, s0: .8, s1: 5.5, glass: true, size: 20 * UI, rot: 0 });
+}
+function impact(x, y) {
+  burst(x, y, 16, 150);
+  if (yeti.hit(x, y)) yeti.bonk();
+  else { const b = built.find(s => s.hit(x, y)); if (b) b.poke(); else if (S.showSnowman && snowman.hit(x, y)) snowman.poke(); else if (y < driftAt(x) + 40) addSnow(x, 14, 3); }
+}
+function splat(x, y) {
+  splats.push({ img: pick(T.splats), x, y, rot: rnd(-.5, .5), t: 0, size: 210 * Math.max(UI, .7), wipe: -1 });
+  for (let i = 0; i < 12; i++) { const r = rnd(4, 10), a = rnd(0, TAU), sp = rnd(160, 420), life = rnd(.35, .7); particles.push({ x, y, size: r * 2.4, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life, max: life, z: 2, g: 420 }); }
+}
+function splatScale(s) { return s.t < .07 ? lerp(.3, 1.1, s.t / .07) : s.t < .17 ? lerp(1.1, 1, (s.t - .07) / .1) : 1; }
+function splatAt(x, y) { for (let i = splats.length - 1; i >= 0; i--) { const s = splats[i]; if (s.wipe < 0 && s.t < 4.5 && Math.hypot(x - s.x, y - (s.y - slideOf(s))) < s.size / 3) return s; } return null; }
+const slideOf = s => s.t > 2.8 ? 48 * Math.pow(Math.min(1, (s.t - 2.8) / 3.2), 2) : 0;
+function say(str, x, y) { bubbles.push({ str, x: clamp(x, 70, W - 70), y: Math.min(y, H - TOP - 50), t: 0 }); }
+function addFootprint(x) {
+  if (x < -20 || x > W + 20) return;
+  footprints.push({ x, age: 0 }); consumeDrift(x, 6, 1.2); if (footprints.length > 60) footprints.shift();
+}
+
+// ---------- the snowman ----------
+class Snowman {
+  constructor(outfit, scale = 1) {
+    this.outfit = outfit; this.scale = scale; this.x = 0; this.y = 0; this.mode = "idle";
+    this.hatOffset = [18, 9, 0][outfit.hat]; this.hatR = [5, 9, 10][outfit.hat];
+    this.parts = [[0, 46, 46], [0, 102, 34], [0, 142, 25], [0, 142 + this.hatOffset, this.hatR]].map(([x, y, r]) => ({ x, y, hx: x, hy: y, r, rot: 0, vx: 0, vy: 0, spin: 0 }));
+    Object.assign(this, { clock: 0, wobble: 0, wobbleV: 0, squash: 0, squashV: 0, blinkT: 2.5, blink: 0, waveT: 9, wave: 0, pokes: 0, lastPoke: -10, surprised: 0,
+      scatterT: 0, reT: 0, lookX: 0, lookY: 0, noseDir: 1, rigRot: 0, rigSX: 1, rigSY: 1, tail: 0, armRot: 0 });
+    this.scarf = PAL.scarves[outfit.scarf % PAL.scarves.length];
+    this.muff = tinted(T.fluff, this.scarf);
+  }
+  hit(px, py) { if (this.mode !== "idle") return false; const s = this.scale, dx = (px - this.x) / (58 * s), dy = (py - (this.y + 95 * s)) / (102 * s); return dx * dx + dy * dy <= 1; }
+  headWorld() { const h = this.parts[2]; return [this.x + h.x * this.scale, this.y + h.y * this.scale]; }
+  say(str) { say(str, this.x + 26 * this.scale, this.y + 192 * this.scale); }
+  greet(name) { this.wave = 2.2; this.say(name ? `Hi ${name}!` : "Hi!"); }
+  poke() {
+    if (this.mode !== "idle") return;
+    this.wobbleV += rnd(2.2, 3.2) * (Math.random() < .5 ? 1 : -1); this.squashV += 7;
+    this.pokes = this.clock - this.lastPoke < .9 ? this.pokes + 1 : 1; this.lastPoke = this.clock;
+    if (this.pokes >= 3) { this.pokes = 0; this.surprised = .6; const [hx, hy] = this.headWorld(); burst(hx + 25 * this.scale * this.noseDir, hy, 28, 200); this.say("Achoo!"); }
+    else if (this.pokes === 1 && Math.random() < .33) this.say(pick(["Hee hee!", "That tickles!", "Brrr!"]));
+  }
+  knock(fromLeft) {
+    if (this.mode !== "idle") return;
+    this.mode = "scattered"; this.scatterT = 3.4; this.rigRot = 0; this.rigSX = this.rigSY = 1; this.wobble = this.wobbleV = this.squash = this.squashV = 0; this.surprised = 99; this.wave = 0; this.armRot = 0;
+    const s = fromLeft ? 1 : -1, L = [[85, 150], [165, 240], [245, 340], [150, 440]];
+    this.parts.forEach((p, i) => { p.vx = s * L[i][0] * rnd(.8, 1.2); p.vy = L[i][1] * rnd(.85, 1.15); p.spin = i === 3 ? -s * rnd(6, 10) : 0; });
+    const [hx, hy] = this.headWorld(); burst(hx, hy, 20, 170);
+  }
+  attachHat() { const h = this.parts[2], hat = this.parts[3]; hat.x = h.x - Math.sin(h.rot) * this.hatOffset; hat.y = h.y + Math.cos(h.rot) * this.hatOffset; hat.rot = h.rot + .07; }
+  localGround(x) { return (driftAt(this.x + x * this.scale) - this.y) / this.scale; }
+  update(dt, look) {
+    this.clock += dt;
+    if (this.mode === "idle") {
+      this.wobbleV += (-90 * this.wobble - 7 * this.wobbleV) * dt; this.wobble += this.wobbleV * dt;
+      this.squashV += (-170 * this.squash - 11 * this.squashV) * dt; this.squash += this.squashV * dt;
+      const br = Math.sin(this.clock * 1.6) * .012;
+      this.rigRot = this.wobble * .12; this.rigSY = 1 + br - this.squash * .1; this.rigSX = 1 - br * .5 + this.squash * .07;
+      this.blinkT -= dt; if (this.blinkT <= 0) { this.blink = .14; this.blinkT = rnd(2.2, 5.5); } this.blink -= dt;
+      this.waveT -= dt; if (this.waveT <= 0) { this.wave = 1.6; this.waveT = rnd(9, 18); }
+      if (this.wave > 0) { this.wave -= dt; this.armRot = .55 + Math.sin(this.clock * 11) * .38; } else this.armRot += (0 - this.armRot) * Math.min(1, 8 * dt);
+      let tx = 0, ty = 0, tilt = 0;
+      if (look) {
+        const [hx, hy] = this.headWorld(), dx = look.x - hx, dy = look.y - hy, d = Math.max(1, Math.hypot(dx, dy)), k = Math.min(1, d / 90) * 2.6;
+        tx = dx / d * k; ty = dy / d * k * .8; tilt = clamp(-dx / 2600, -.08, .08);
+        if (Math.abs(dx) > 40) this.noseDir += ((dx > 0 ? 1 : -1) - this.noseDir) * Math.min(1, 5 * dt);
+      }
+      this.lookX += (tx - this.lookX) * Math.min(1, 9 * dt); this.lookY += (ty - this.lookY) * Math.min(1, 9 * dt);
+      const head = this.parts[2]; head.rot += (tilt - head.rot) * Math.min(1, 4 * dt);
+      this.attachHat();
+    } else if (this.mode === "scattered") {
+      this.parts.forEach((p, i) => {
+        p.vy -= 980 * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+        const g = this.localGround(p.x);
+        if (p.y - p.r <= g) {
+          p.y = g + p.r; if (p.vy < -90) { p.vy = -p.vy * .32; p.vx *= .8; } else p.vy = 0;
+          p.vx *= Math.max(0, 1 - 2.4 * dt);
+          if (i < 3) p.rot -= p.vx * dt / p.r; else { const flat = Math.round(p.rot / Math.PI) * Math.PI; p.rot += (flat - p.rot) * Math.min(1, 7 * dt); }
+        } else if (i === 3) p.rot += p.spin * dt;
+        const s = this.scale, lo = (p.r * s - this.x) / s, hi = (W - p.r * s - this.x) / s;
+        if (p.x < lo) { p.x = lo; p.vx = Math.abs(p.vx) * .4; } if (p.x > hi) { p.x = hi; p.vx = -Math.abs(p.vx) * .4; }
+      });
+      this.scatterT -= dt;
+      if (this.scatterT <= 0) { this.mode = "reassembling"; this.reT = 0; this.parts.forEach(p => { p.fx = p.x; p.fy = p.y; p.frot = p.rot; }); }
+    } else {
+      this.reT += dt; const delays = [0, .24, .48, .84]; let done = true;
+      this.parts.forEach((p, i) => {
+        const u = clamp((this.reT - delays[i]) / .5, 0, 1); if (u < 1) done = false;
+        const e = easeInOut(u), tRot = i === 3 ? .07 : Math.round(p.frot / TAU) * TAU, hop = 46 + Math.hypot(p.hx - p.fx, p.hy - p.fy) * .25;
+        p.x = lerp(p.fx, p.hx, e); p.y = lerp(p.fy, p.hy, e) + hop * 4 * u * (1 - u); p.rot = lerp(p.frot, tRot, e);
+      });
+      if (done) {
+        this.mode = "idle"; this.parts.slice(0, 3).forEach(p => p.rot = 0); this.attachHat(); this.squashV += 9; this.surprised = 0;
+        burst(this.x, this.y + 10, 14, 120); this.say(pick(["Hey!", "Hmph!", "Not again!"]));
+      }
+    }
+    this.tail = clamp(Math.sin(this.clock * 2.3) * .06 + wind * .006 + this.wobble * .25, -.7, .7);
+    this.surprised -= dt;
+  }
+  draw() {
+    const s = this.scale;
+    ctx.save(); ctx.translate(this.x, this.y); ctx.scale(s, s);
+    sprite(T.shadow, 0, 3, 132, 30);
+    ctx.rotate(this.rigRot); ctx.scale(this.rigSX, this.rigSY);
+    const [b, m, h, hat] = this.parts;
+    this.ball(b, () => {});
+    // middle ball, arms tucked behind it
+    ctx.save(); ctx.translate(m.x, m.y); ctx.rotate(m.rot);
+    this.arm(-29, 6, -1, -.12); this.arm(29, 6, 1, this.armRot);
+    sprite(T.snowball, 0, 0, 68, 68);
+    for (const dy of [-19, -6, 7]) circle(0, dy, 3.3, PAL.coal);
+    ctx.lineCap = "round"; ctx.strokeStyle = this.scarf; ctx.lineWidth = 12; ctx.beginPath(); ctx.arc(0, 73, 56, Math.PI * 4 / 3, Math.PI * 5 / 3); ctx.stroke();
+    ctx.setLineDash([5, 9]); ctx.lineDashOffset = 2; ctx.lineCap = "butt"; ctx.strokeStyle = mix(this.scarf, "white", .5); ctx.stroke(); ctx.setLineDash([]);
+    ctx.save(); ctx.translate(12, 16); ctx.rotate(this.tail);
+    ctx.fillStyle = this.scarf; rrect(-6, -32, 12, 32, 3); ctx.fill();
+    ctx.fillStyle = mix(this.scarf, "white", .5); ctx.fillRect(-6, -12, 12, 4); ctx.fillRect(-6, -22, 12, 4);
+    ctx.strokeStyle = this.scarf; ctx.lineWidth = 2; ctx.lineCap = "round"; ctx.beginPath(); for (const x of [-4, 0, 4]) { ctx.moveTo(x, -32); ctx.lineTo(x, -38); } ctx.stroke();
+    ctx.restore(); ctx.restore();
+    // head
+    ctx.save(); ctx.translate(h.x, h.y); ctx.rotate(h.rot);
+    sprite(T.snowball, 0, 0, 50, 50);
+    for (const x of [-15, 15]) ellipse(x, -5, 6, 4.5, PAL.cheek);
+    const ey = 6 + this.lookY, sy = this.blink > 0 && this.mode === "idle" ? .15 : 1;
+    for (const x of [-8.5, 8.5]) { ctx.save(); ctx.translate(x + this.lookX, ey); ctx.scale(1, sy); circle(0, 0, 3.7, PAL.coal); circle(1.1, 1.3, 1.1, "#fff"); ctx.restore(); }
+    if (this.surprised > 0) circle(0, -10, 4.2, PAL.coal);
+    else for (const deg of [215, 242, 270, 298, 325]) { const a = deg * Math.PI / 180; circle(Math.cos(a) * 11, -1 + Math.sin(a) * 11, 1.8, PAL.coal); }
+    ctx.save(); ctx.translate(1, -1); const nd = Math.abs(this.noseDir) < .12 ? (this.noseDir < 0 ? -.12 : .12) : this.noseDir; ctx.scale(nd, 1);
+    ctx.fillStyle = PAL.carrot; ctx.strokeStyle = PAL.carrotDark; ctx.lineWidth = .8;
+    ctx.beginPath(); ctx.moveTo(0, 3.8); ctx.quadraticCurveTo(14, 3, 25, -1); ctx.quadraticCurveTo(13, -2.6, 0, -3.8); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore(); ctx.restore();
+    // hat
+    ctx.save(); ctx.translate(hat.x, hat.y); ctx.rotate(hat.rot); this.drawHat(); ctx.restore();
+    ctx.restore();
+  }
+  ball(p) { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); sprite(T.snowball, 0, 0, p.r * 2, p.r * 2); ctx.restore(); }
+  arm(x, y, sign, rot) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.strokeStyle = PAL.stick; ctx.lineWidth = 3.4; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(20 * sign, 2, 40 * sign, 13); ctx.moveTo(40 * sign, 13); ctx.lineTo(51 * sign, 23);
+    ctx.moveTo(40 * sign, 13); ctx.lineTo(52 * sign, 8); ctx.moveTo(24 * sign, 5); ctx.lineTo(28 * sign, 15); ctx.stroke(); ctx.restore();
+  }
+  drawHat() {
+    const c = this.scarf;
+    if (this.outfit.hat === 0) {
+      ctx.fillStyle = PAL.hat; rrect(-15, 0, 30, 31, 2); ctx.fill(); ctx.fillStyle = c; ctx.fillRect(-15, 2, 30, 6);
+      ctx.fillStyle = "rgba(255,255,255,.18)"; rrect(-11, 10, 3, 18, 1.5); ctx.fill(); ellipse(0, 1, 27, 5, PAL.hat);
+    } else if (this.outfit.hat === 1) {
+      ctx.fillStyle = c; ctx.beginPath(); ctx.arc(0, 6, 26, 0, Math.PI); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = mix(c, "black", .18); rrect(-28, -3, 56, 13, 6); ctx.fill();
+      ctx.strokeStyle = mix(c, "black", .32); ctx.lineWidth = 1.2; ctx.beginPath(); for (let i = 0; i < 9; i++) { const x = -22 + i * 5.5; ctx.moveTo(x, -1); ctx.lineTo(x, 8); } ctx.stroke();
+      sprite(T.fluff, 0, 34, 22, 22);
+    } else {
+      ctx.strokeStyle = "#5a5a66"; ctx.lineWidth = 3.6; ctx.lineCap = "round"; ctx.beginPath(); ctx.arc(0, 2, 28, Math.PI * .1, Math.PI * .9); ctx.stroke();
+      for (const x of [-27, 27]) sprite(this.muff, x, -2, 21, 21);
+    }
+  }
+}
+
+// ---------- the yeti ----------
+class Yeti {
+  constructor() {
+    Object.assign(this, { x: -150, y: 0, scale: 1, beat: "away", beatT: 0, away: rnd(25, 40), throwsLeft: 0, walkPhase: 0, lastStep: 0, facing: 1, clock: 0,
+      blinkT: 3, speed: 70, lean: 0, crouch: 1, bob: 0, front: 0, back: 0, happy: false, held: false, legL: 22, legR: 22, eyeX: 8 });
+  }
+  get visible() { return this.beat !== "away"; }
+  summon() { if (this.beat === "away") this.away = .3; }
+  hit(px, py) { if (!this.visible || this.beat === "bonked") return false; const s = this.scale; return Math.abs(px - this.x) < 52 * s && py > this.y - 6 && py < this.y + 172 * s; }
+  set(b) { this.beat = b; this.beatT = 0; }
+  bonk() { if (!this.visible || this.beat === "bonked") return; this.held = false; this.set("bonked"); burst(this.x, this.y + 120 * this.scale, 22, 200); say(pick(["Eep!", "No fair!", "You got me!"]), this.x + 20, this.y + 182 * this.scale); }
+  hand() { // where the front paw is, in the world
+    const s = this.scale, a = this.armFront || 0, px = 26 + Math.sin(a) * 50, py = 88 - Math.cos(a) * 50;
+    const r = this.lean * this.facing, lx = px * this.facing, ly = py * this.crouch + this.bob;
+    return [this.x + (lx * Math.cos(r) - ly * Math.sin(r)) * s, this.y + (lx * Math.sin(r) + ly * Math.cos(r)) * s];
+  }
+  walk(dt, dir) {
+    this.facing = dir; this.x += this.speed * dir * dt * this.scale; this.walkPhase += dt * this.speed / 10;
+    this.legL = 22 + Math.max(0, Math.sin(this.walkPhase)) * 8; this.legR = 22 + Math.max(0, -Math.sin(this.walkPhase)) * 8;
+    const step = Math.floor(this.walkPhase / Math.PI);
+    if (step !== this.lastStep) { this.lastStep = step; addFootprint(this.x + ((step % 2 ? 14 : -14) + 6) * this.facing * this.scale); }
+  }
+  update(dt, enabled, snowX) {
+    this.clock += dt; this.beatT += dt;
+    if (!enabled && this.beat === "away") return;
+    if (!enabled && !["walkOut", "bonked", "away"].includes(this.beat)) { this.held = false; this.set("walkOut"); }
+    this.blinkT -= dt; if (this.blinkT <= 0) this.blinkT = rnd(2, 5);
+    let lean = 0, crouch = 1, bob = 0, front = 0, back = 0, happy = false; const t = this.beatT;
+    switch (this.beat) {
+      case "away": this.away -= dt; if (this.away <= 0) { this.facing = 1; this.x = -150; this.speed = 70; this.set("walkIn"); } return;
+      case "walkIn": {
+        this.walk(dt, 1); bob = Math.abs(Math.sin(this.walkPhase)) * 5; front = -Math.sin(this.walkPhase) * .5; back = Math.sin(this.walkPhase) * .5;
+        const stopX = (snowX !== null ? snowX : W * .6) - 125 * this.scale; if (this.x >= stopX) this.set("sneak"); break;
+      }
+      case "sneak": crouch = .95 + Math.sin(t * 9) * .01; happy = true; bob = Math.sin(t * 9) * 1.2; if (t > 1) this.set(snowX === null ? "scoop" : "windup"); break;
+      case "windup": { const u = Math.min(1, t / .45); lean = .17 * easeInOut(u); front = -.5 * u; back = -.6 * u; crouch = 1 - .05 * u; if (t > .45) this.set("shove"); break; }
+      case "shove": { const u = Math.min(1, t / .12); lean = lerp(.17, -.2, u); front = lerp(-.5, 1.55, u); back = lerp(-.6, 1.45, u);
+        if (t >= .08 && t - dt < .08 && S.showSnowman) snowman.knock(true); if (t > .38) this.set("laugh"); break; }
+      case "laugh": happy = true; bob = Math.abs(Math.sin(t * 16)) * 5; lean = -.05 + Math.sin(t * 16) * .03; front = .3; back = .2; if (t > .95) { this.throwsLeft = 3; this.set("scoop"); } break;
+      case "scoop": { const u = Math.min(1, t / .3); crouch = 1 - .12 * Math.sin(Math.PI * Math.min(1, t / .55)); lean = -.12 * u; front = .55 * u;
+        if (t > .3 && !this.held) { this.held = true; const [hx, hy] = this.hand(); burst(hx, hy, 8, 90); }
+        if (t > .55) { if (this.throwsLeft <= 0) this.throwsLeft = 3; this.set("aim"); } break; }
+      case "aim": { const u = easeInOut(Math.min(1, t / .42)); lean = .12 * u; front = lerp(.55, 3.7, u); back = -.4 * u; happy = true; if (t > .45) this.set("release"); break; }
+      case "release": { const u = Math.min(1, t / .1); lean = lerp(.12, -.14, u); front = lerp(3.7, 1.25, u); back = .4;
+        if (this.held && t > .04) { this.held = false; const [hx, hy] = this.hand(); throwAtGlass(hx, hy); this.throwsLeft--; }
+        if (t > .3) this.set(this.throwsLeft > 0 ? "scoop" : "wave"); break; }
+      case "wave": happy = true; front = 2.85 + Math.sin(t * 12) * .35; bob = Math.sin(t * 6) * 1.5; if (t > 1.3) { this.speed = 82; this.set("walkOut"); } break;
+      default: {
+        const bonked = this.beat === "bonked"; if (bonked) this.speed = 240;
+        this.walk(dt, -1); bob = Math.abs(Math.sin(this.walkPhase)) * (bonked ? 9 : 5);
+        front = -Math.sin(this.walkPhase) * (bonked ? 1 : .5); back = Math.sin(this.walkPhase) * (bonked ? 1 : .5);
+        if (this.x < -160) { this.away = rnd(150, 280); this.set("away"); return; }
+      }
+    }
+    if (!["walkIn", "walkOut", "bonked"].includes(this.beat)) { this.legL += (22 - this.legL) * Math.min(1, 12 * dt); this.legR += (22 - this.legR) * Math.min(1, 12 * dt); }
+    this.lean = lean; this.crouch = crouch; this.bob = bob; this.happy = happy;
+    this.armFront = (this.armFront || 0) + (front - (this.armFront || 0)) * Math.min(1, (this.beat === "release" || this.beat === "shove" ? 40 : 14) * dt);
+    this.armBack = (this.armBack || 0) + (back - (this.armBack || 0)) * Math.min(1, 14 * dt);
+    const lookCam = ["sneak", "aim", "wave", "laugh"].includes(this.beat);
+    this.eyeX += ((8 + (lookCam ? 0 : 3)) - this.eyeX) * Math.min(1, 8 * dt);
+  }
+  armDraw(x, y, rot, front) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
+    sprite(T.fluff, 0, -4, 30, 30); sprite(T.fluff, 0, -19, 28, 28); sprite(T.fluff, 0, -34, 29, 29);
+    ellipse(1, -48, 11, 9.5, PAL.skin); ctx.strokeStyle = PAL.skinDark; ctx.lineWidth = 1.2; ctx.stroke();
+    if (front && this.held) sprite(T.snowball, 0, -50, 20, 20);
+    ctx.restore();
+  }
+  draw() {
+    if (!this.visible) return;
+    const s = this.scale;
+    ctx.save(); ctx.translate(this.x, this.y); ctx.scale(s, s);
+    sprite(T.shadow, 0, 3, 120, 26);
+    ctx.translate(0, this.bob); ctx.rotate(this.lean * this.facing); ctx.scale(this.facing, this.crouch);
+    this.armDraw(-24, 88, this.armBack || 0, false);
+    for (const [x, ly] of [[-14, this.legL], [14, this.legR]]) { sprite(T.fluff, x, ly, 40, 40); ellipse(x + 5, ly - 15, 16, 7, PAL.skin); ctx.strokeStyle = PAL.skinDark; ctx.lineWidth = 1.2; ctx.stroke(); }
+    sprite(T.fluff, 0, 62, 98, 98); sprite(T.fluff, -14, 86, 64, 64); sprite(T.fluff, 14, 86, 64, 64);
+    ctx.lineCap = "round"; ctx.strokeStyle = PAL.yetiScarf; ctx.lineWidth = 11; ctx.beginPath(); ctx.arc(4, 132, 46, Math.PI * 1.32, Math.PI * 1.68); ctx.stroke();
+    ctx.setLineDash([5, 8]); ctx.lineCap = "butt"; ctx.strokeStyle = mix(PAL.yetiScarf, "white", .55); ctx.stroke(); ctx.setLineDash([]);
+    // head
+    ctx.save(); ctx.translate(4, 118);
+    sprite(T.fluff, -18, 32, 28, 28); sprite(T.fluff, 2, 38, 30, 30); sprite(T.fluff, 21, 30, 26, 26); sprite(T.fluff, 0, 0, 78, 78);
+    ellipse(8, -4, 24, 18.5, PAL.skin); ctx.strokeStyle = PAL.skinDark; ctx.lineWidth = 1; ctx.stroke();
+    const sy = this.blinkT < .13 ? .15 : 1;
+    for (const x of [-8, 8]) { ctx.save(); ctx.translate(this.eyeX + x, 2); ctx.scale(1, sy); ellipse(0, 0, 3.5, 4.5, PAL.coal); circle(1.2, 1.8, 1.3, "#fff"); ctx.restore(); }
+    for (const x of [-9, 9]) { ellipse(8 + x, this.happy ? 13 : 11, 7.5, 3, "#fff", x < 0 ? .28 : -.28); ctx.strokeStyle = PAL.skinDark; ctx.lineWidth = .8; ctx.stroke(); }
+    ellipse(9, -5, 4.5, 3, PAL.skinDark);
+    if (this.happy) {
+      ctx.fillStyle = "#381f38"; ctx.beginPath(); ctx.moveTo(-3, -9); ctx.lineTo(19, -9); ctx.arc(8, -9, 11, 0, Math.PI, true); ctx.closePath(); ctx.fill();
+      ellipse(8, -17, 5.5, 3, "#f2738c"); ctx.fillStyle = "#fff"; rrect(1, -12, 14, 3, 1); ctx.fill();
+    } else { ctx.strokeStyle = PAL.coal; ctx.lineWidth = 2; ctx.lineCap = "round"; ctx.beginPath(); ctx.arc(8, -7, 8, Math.PI * 1.2, Math.PI * 1.8); ctx.stroke(); }
+    ctx.restore();
+    this.armDraw(26, 88, this.armFront || 0, true);
+    ctx.restore();
+  }
+}
+
+// ---------- the plough ----------
+function drawPlough(p) {
+  const s = UI; ctx.save(); ctx.translate(p.x, p.y); ctx.scale(s, s);
+  sprite(T.shadow, 6, 2, 170, 24);
+  const red = "#db2b2e", dark = "#94141a";
+  const box = (x, y, w, h, r, fill, stroke) => { ctx.fillStyle = fill; rrect(x, y, w, h, r); ctx.fill(); if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1.2; ctx.stroke(); } };
+  box(-52, 10, 104, 24, 6, red, dark); ctx.fillStyle = "rgba(255,255,255,.75)"; ctx.fillRect(-52, 19, 104, 4);
+  box(-2, 30, 40, 12, 5, red, dark); box(-48, 30, 48, 36, 7, red, dark); box(-41, 42, 33, 18, 4, "#bde0fc", dark);
+  ctx.strokeStyle = "rgba(255,255,255,.7)"; ctx.lineWidth = 2.5; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(-36, 46); ctx.lineTo(-28, 57); ctx.stroke();
+  box(-8, 36, 5, 26, 2, "#737885"); box(-27, 66, 12, 7, 2.5, "#ffb31f");
+  if (Math.sin(p.clock * 9) > 0) sprite(tintedGlow, -21, 70, 34, 34, 0, .95);
+  box(44, 17, 14, 7, 2, "#6b707f");
+  ctx.fillStyle = "#fcc424"; ctx.strokeStyle = "#996b0d"; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(56, 2); ctx.lineTo(68, 2);
+  ctx.quadraticCurveTo(62, 24, 74, 46); ctx.lineTo(62, 46); ctx.quadraticCurveTo(52, 24, 56, 2); ctx.closePath(); ctx.fill(); ctx.stroke();
+  const r = Math.min(34, 9 + Math.sqrt(p.collected) * 2.2); sprite(T.snowball, 70 + r * .7, r * .85, r * 2, r * 2, p.waveRot);
+  for (const x of [-30, 30]) { ctx.save(); ctx.translate(x, 12); ctx.rotate(p.wheel); circle(0, 0, 13, "#26262e"); circle(0, 0, 5.5, "#b8bdc7"); ctx.fillStyle = "#525461"; ctx.fillRect(-1.5, -11, 3, 7); ctx.restore(); }
+  ctx.restore();
+}
+const tintedGlow = paint(32, 32, g => { g.fillStyle = radial(g, 16, 16, 16, [[0, "rgba(255,180,30,1)"], [.4, "rgba(255,180,30,.7)"], [1, "rgba(255,180,30,0)"]]); g.fillRect(0, 0, 32, 32); });
+
+// ---------- build your own snowman ----------
+function newStack(x, r) { const st = { balls: [{ x, y: driftAt(x) * .85 + r, r, rot: 0 }] }; stacks.push(st);
+  if (stacks.length > 10) { const old = stacks.find(s => s.balls.length === 1 && s !== st); if (old) removeStack(old, true); } return st; }
+function removeStack(st, puff) { if (puff) st.balls.forEach(b => burst(b.x, b.y, 8, 110)); stacks = stacks.filter(s => s !== st); }
+function layout(st) { const x = st.balls[0].x; st.balls[0].y = driftAt(x) * .85 + st.balls[0].r;
+  for (let i = 1; i < st.balls.length; i++) { const lo = st.balls[i - 1], b = st.balls[i]; b.x = x; b.y = lo.y + lo.r + b.r - Math.min(b.r, lo.r) * .3; } }
+function stackAt(x, y) { for (let i = stacks.length - 1; i >= 0; i--) for (const b of stacks[i].balls) if (Math.hypot(x - b.x, y - b.y) <= b.r + 8) return stacks[i]; return null; }
+function tryMerge(st) {
+  const me = st.balls[0], other = stacks.find(o => o !== st && Math.abs(o.balls[0].x - me.x) < .62 * (o.balls[0].r + me.r));
+  if (!other) return;
+  if (other.balls.length + st.balls.length > 3) { me.x = clamp(me.x + (me.x < other.balls[0].x ? -1 : 1) * (me.r + 12), me.r, W - me.r); layout(st); return; }
+  const ax = other.balls[0].x; other.balls = other.balls.concat(st.balls).sort((a, b) => b.r - a.r); other.balls[0].x = ax;
+  stacks = stacks.filter(s => s !== st); layout(other); burst(ax, other.balls[other.balls.length - 1].y, 10, 120);
+  if (other.balls.length === 3) completeSnowman(other);
+}
+function completeSnowman(st) {
+  const b = st.balls[0], s = new Snowman({ scarf: Math.floor(Math.random() * 7), hat: Math.floor(Math.random() * 3) }, clamp(b.r / 46, .5, 1.15));
+  s.x = b.x; s.y = groundUnder(b.x, 30); built.push(s); removeStack(st, false);
+  burst(b.x, s.y + 90 * s.scale, 34, 240); s.say(displayName() ? `Thanks, ${displayName()}!` : "Thank you!");
+  if (built.length > 8) { const old = built.shift(); burst(old.x, old.y + 60, 20, 160); }
+  saveBuilt();
+}
+function saveBuilt() { store.set("built", built.map(s => ({ x: s.x / Math.max(1, W), scale: s.scale, outfit: s.outfit }))); }
+function loadBuilt() { (store.get("built", []) || []).slice(0, 8).forEach(it => { const s = new Snowman(it.outfit, it.scale); s.x = it.x * W; s.y = groundUnder(s.x, 30); built.push(s); }); }
+
+// ---------- characters ----------
+let snowman = null, yeti = null;
+function homeX() {
+  let x = W - 170 * UI;
+  if (dock && x + 70 * UI > dock.minX && x - 70 * UI < dock.maxX) x = dock.maxX + 90 * UI < W - 40 ? dock.maxX + 90 * UI : dock.minX - 110 * UI;
+  return x;
+}
+
+// ---------- input ----------
+let downAt = null, winDrag = null;
+function toWorld(e) { return { x: e.clientX, y: H - e.clientY }; }
+function windowAt(x, y) { for (let i = windows.length - 1; i >= 0; i--) { const w = windows[i]; if (w.open && x >= w.x && x <= w.x + w.w && y >= w.y && y <= w.y + w.h) return w; } return null; }
+cvs.addEventListener("pointerdown", e => {
+  hideHint(); closePanel(); cvs.setPointerCapture(e.pointerId);
+  const { x, y } = toWorld(e); pointer.x = x; pointer.y = y; downAt = { x, y };
+  const sp = splatAt(x, y); if (sp) { sp.wipe = 0; burst(sp.x, sp.y - slideOf(sp), 14, 160); return; }
+  const w = windowAt(x, y);
+  if (w) {
+    windows = windows.filter(o => o !== w).concat([w]);
+    const top = winTop(w), tb = 28;
+    if (y >= top - tb) {
+      if (Math.hypot(x - (w.x + 16), y - (top - 14)) < 9) { closeWindow(w); return; }
+      winDrag = { w, ox: x - w.x, oy: y - w.y, lastTop: top };
+    }
+    return;
+  }
+  const b = [...built].reverse().find(s => s.hit(x, y)); if (b) { b.poke(); drag = { kind: "snowman", s: b, off: b.x - x }; return; }
+  if (S.showSnowman && snowman.hit(x, y)) { snowman.poke(); return; }
+  if (yeti.hit(x, y)) { throwIntoScene(x, y); return; }
+  const st = stackAt(x, y); if (st) { drag = st.balls.length === 1 ? { kind: "roll", st } : { kind: "slide", st, off: st.balls[0].x - x }; return; }
+  if (y <= driftAt(x) + 22) { const n = newStack(x, 9); consumeDrift(x, 9, 2); drag = { kind: "roll", st: n }; return; }
+  if (S.clickSnowballs && !S.paused && y < H - TOP) throwIntoScene(x, y);
+});
+cvs.addEventListener("pointermove", e => {
+  const { x, y } = toWorld(e), dt = 1 / 60;
+  pointer.vx += ((x - pointer.x) / dt - pointer.vx) * .5; pointer.vy += ((y - pointer.y) / dt - pointer.vy) * .5;
+  if (Math.abs(x - pointer.x) + Math.abs(y - pointer.y) > .5) pointer.moved = clock;
+  pointer.x = x; pointer.y = y;
+  if (winDrag) {
+    const w = winDrag.w; w.x = clamp(x - winDrag.ox, -w.w + 60, W - 60); w.y = clamp(y - winDrag.oy, 60 * UI, H - TOP - w.h);
+    const top = winTop(w); if (winDrag.lastTop - top > 40) { shed(w.x, w.x + w.w, winDrag.lastTop, w.heights, .5); w.heights = w.heights.map(h => h * .5); } winDrag.lastTop = top; return;
+  }
+  if (!drag) return;
+  if (drag.kind === "roll") {
+    const b = drag.st.balls[0], nx = clamp(x, b.r, W - b.r), dx = nx - b.x; b.x = nx; b.rot -= dx / b.r;
+    const snow = driftAt(nx); if (snow > 2.5 && b.r < 54) { const grow = Math.abs(dx) * .06 * Math.min(1, snow / 10); b.r = Math.min(54, b.r + grow); consumeDrift(nx, b.r * .7, grow * 1.4); }
+    layout(drag.st);
+  } else if (drag.kind === "slide") { const b = drag.st.balls[0]; b.x = clamp(x + drag.off, b.r, W - b.r); layout(drag.st); }
+  else drag.s.x = clamp(x + drag.off, -30, W + 30);
+});
+function endPointer() {
+  winDrag = null; if (!drag) return; const d = drag; drag = null;
+  if (d.kind === "snowman") { if (d.s.x < 24 || d.s.x > W - 24) { burst(d.s.x, d.s.y + 80, 30, 220); built = built.filter(s => s !== d.s); } saveBuilt(); }
+  else tryMerge(d.st);
+}
+cvs.addEventListener("pointerup", endPointer); cvs.addEventListener("pointercancel", endPointer);
+cvs.addEventListener("pointerleave", e => { if (e.pointerType === "mouse") { pointer.x = -999; } });
+function closeWindow(w) { shed(w.x, w.x + w.w, winTop(w), w.heights, 1); w.open = false; w.heights = w.heights.map(() => 0); }
+
+// ---------- frame ----------
+let last = 0;
+function frame(now) {
+  requestAnimationFrame(frame);
+  if (document.hidden) { last = now; return; }
+  let dt = last ? (now - last) / 1000 : 1 / 60; last = now; dt = clamp(dt, 0, 1 / 20);
+  if (!S.paused) step(dt);
+  draw();
+}
+function step(dt) {
+  clock += dt;
+  gustTimer -= dt; if (gustTimer <= 0) { gustTarget = rnd(-34, 34) * (1 + 1.2 * blizzardAmount()); gustTimer = rnd(5, 11); }
+  gust += (gustTarget - gust) * Math.min(1, .8 * dt);
+  wind = (14 * Math.sin(clock * .11) + 8 * Math.sin(clock * .043 + 2) + gust) * S.wind;
+  if (blizzardT > 0) blizzardT -= dt;
+  syncFlakes(); updateFlakes(dt);
+  // puffs
+  for (let i = particles.length - 1; i >= 0; i--) { const p = particles[i]; p.vy -= p.g * dt; p.vx *= Math.max(0, 1 - 1.8 * dt); p.x += (p.vx + wind * .5) * dt; p.y += p.vy * dt; p.life -= dt; if (p.life <= 0 || p.y < -20) particles.splice(i, 1); }
+  // clumps of snow falling off windows
+  for (let i = clumps.length - 1; i >= 0; i--) {
+    const c = clumps[i], prev = c.y - c.r; c.vy -= 900 * dt; c.x += c.vx * dt; c.y += c.vy * dt; c.rot += c.spin * dt;
+    const l = ledgeHit(prev, c.y - c.r, c.x);
+    if (l) { addToLedge(l, c.x, c.r * .8); burst(c.x, c.y, 3, 60); clumps.splice(i, 1); continue; }
+    if (c.y - c.r <= driftAt(c.x)) { addSnow(c.x, c.r * 1.6, c.r * .7); burst(c.x, c.y, 4, 70); clumps.splice(i, 1); }
+  }
+  // snowballs in the air
+  for (let i = throwsInFlight.length - 1; i >= 0; i--) {
+    const t = throwsInFlight[i]; t.u = Math.min(1, t.u + dt / t.dur); const u = t.u, v = 1 - u;
+    t.x = v * v * t.p0[0] + 2 * v * u * t.p1[0] + u * u * t.p2[0]; t.y = v * v * t.p0[1] + 2 * v * u * t.p1[1] + u * u * t.p2[1];
+    t.scale = lerp(t.s0, t.s1, t.glass ? Math.pow(u, 1.7) : 1 - v * v); t.rot += (t.glass ? 5 : -8) * dt;
+    if (u >= 1) { throwsInFlight.splice(i, 1); t.glass ? splat(t.p2[0], t.p2[1]) : impact(t.p2[0], t.p2[1]); }
+  }
+  for (let i = splats.length - 1; i >= 0; i--) { const s = splats[i]; s.t += dt; if (s.wipe >= 0) s.wipe += dt; if (s.t > 6 || s.wipe > .2) splats.splice(i, 1); }
+  for (let i = bubbles.length - 1; i >= 0; i--) { bubbles[i].t += dt; if (bubbles[i].t > 2.25) bubbles.splice(i, 1); }
+  // drifts melt slowly and settle into natural slopes
+  const melt = Math.max(0, 1 - .0006 * dt), settle = Math.min(1, dt * 8) * .5;
+  const relax = (a, lim) => { for (let i = 1; i < a.length; i++) { const d = a[i] - a[i - 1]; if (Math.abs(d) > lim) { const m = (Math.abs(d) - lim) * settle; if (d > 0) { a[i] -= m; a[i - 1] += m; } else { a[i] += m; a[i - 1] -= m; } } } };
+  for (let i = 0; i < drift.length; i++) drift[i] *= melt; relax(drift, 5);
+  for (const l of ledges()) { const h = l.ref.heights; for (let i = 0; i < h.length; i++) h[i] *= Math.max(0, 1 - .0015 * dt); relax(h, 4); }
+  // sparkles
+  for (const s of sparkles) { s.t += dt; if (s.t >= s.dur) { s.dur = rnd(.6, 1.2); s.t = -rnd(.5, 3); for (let k = 0; k < 5; k++) { const x = rnd(10, W - 10), h = driftAt(x); if (h > 9) { s.x = x; s.y = h - rnd(2, Math.max(3, h * .45)); break; } } } }
+  for (let i = footprints.length - 1; i >= 0; i--) { footprints[i].age += dt; if (footprints[i].age > 16) footprints.splice(i, 1); }
+  // plough
+  if (plough) {
+    const p = plough, speed = 380 * Math.max(UI, .7); p.x += speed * dt; p.clock += dt; const lastFront = ploughFront; ploughFront = p.x + 70 * UI;
+    p.y = groundUnder(p.x, 50) * .35; p.wheel -= speed * dt / (13 * UI); p.waveRot -= speed * dt * .02;
+    for (let i = 0; i < drift.length; i++) { const x = i * COL; if (x < ploughFront && drift[i] > 2.5) { const take = (drift[i] - 2.5) * Math.min(1, 12 * dt); drift[i] -= take; if (x > ploughFront - 60) p.collected += take; } }
+    for (const l of ledges()) { const mid = (l.minX + l.maxX) / 2; if (mid > lastFront && mid <= ploughFront) { shed(l.minX, l.maxX, l.topY, l.ref.heights, 1); l.ref.heights = l.ref.heights.map(() => 0); } }
+    for (const st of [...stacks]) if (st.balls[0].x < ploughFront) { p.collected += st.balls.reduce((a, b) => a + b.r, 0); removeStack(st, true); }
+    if (yeti.hit(ploughFront, yeti.y + 60)) yeti.bonk();
+    sprayClock += dt; if (sprayClock > .05) { sprayClock = 0; for (let k = 0; k < 2; k++) { const r = rnd(1.5, 3.5), life = rnd(.6, 1); particles.push({ x: ploughFront + 14, y: p.y + 30 * UI, size: r * 3, vx: rnd(60, 220), vy: rnd(120, 320), life, max: life, z: 0, g: 420 }); } }
+    if (p.x > W + 180) plough = null;
+  }
+  // characters
+  const look = pointer.x > -900 ? pointer : null;
+  if (S.showSnowman) {
+    if (snowman.mode === "idle") { snowman.x += (homeX() - snowman.x) * Math.min(1, 3 * dt); snowman.y += (groundUnder(snowman.x, 40 * UI) - snowman.y) * Math.min(1, 2 * dt); }
+    snowman.update(dt, look);
+    if (greetIn > 0) { greetIn -= dt; if (greetIn <= 0) snowman.greet(displayName()); }
+  }
+  for (const s of built) { if (s.mode === "idle") s.y += (groundUnder(s.x, 40 * s.scale) - s.y) * Math.min(1, 2 * dt); s.update(dt, look); }
+  yeti.y = groundUnder(yeti.x, 30); yeti.update(dt, S.yetiEnabled, S.showSnowman && snowman.mode === "idle" ? snowman.x : null);
+}
+
+function pileOn(minX, topY, heights, maxX) {
+  const n = heights.length; if (n < 3 || heights.reduce((a, b) => a + b, 0) < .5) return;
+  const h = i => heights[i] * Math.min(1, (Math.min(i, n - 1 - i) + .6) / 3.5);
+  ctx.beginPath(); ctx.moveTo(minX, topY); ctx.lineTo(minX, topY + h(0));
+  for (let i = 1; i < n - 1; i++) ctx.quadraticCurveTo(Math.min(minX + i * COL, maxX), topY + h(i), Math.min(minX + (i + .5) * COL, maxX), topY + (h(i) + h(i + 1)) / 2);
+  ctx.lineTo(maxX, topY + h(n - 1)); ctx.lineTo(maxX, topY); ctx.closePath();
+  const g = ctx.createLinearGradient(0, topY + 28, 0, topY); g.addColorStop(0, "#fff"); g.addColorStop(1, "#d6e2f5"); ctx.fillStyle = g; ctx.fill();
+  ctx.strokeStyle = PAL.rim; ctx.lineWidth = 1.2; ctx.stroke();
+}
+function drawWindow(w) {
+  const top = winTop(w);
+  ctx.save(); ctx.shadowColor = "rgba(10,20,50,.35)"; ctx.shadowBlur = 30; ctx.shadowOffsetY = -10;
+  ctx.fillStyle = "rgba(250,251,254,.94)"; rrect(w.x, w.y, w.w, w.h, 11); ctx.fill(); ctx.restore();
+  ctx.save(); rrect(w.x, w.y, w.w, w.h, 11); ctx.clip(); ctx.fillStyle = "rgba(232,236,245,.96)"; ctx.fillRect(w.x, top - 28, w.w, 28);
+  ctx.fillStyle = "rgba(0,0,0,.08)"; ctx.fillRect(w.x, top - 28, w.w, 1); ctx.restore();
+  ctx.strokeStyle = "rgba(0,0,0,.14)"; ctx.lineWidth = 1; rrect(w.x + .5, w.y + .5, w.w - 1, w.h - 1, 11); ctx.stroke();
+  [["#ff5f57", 16], ["#febc2e", 34], ["#28c840", 52]].forEach(([c, dx]) => circle(w.x + dx, top - 14, 6, c));
+  text(w.title, w.x + w.w / 2, top - 14, "600 13px -apple-system, sans-serif", "#3a4560");
+  w.lines.forEach((l, i) => text(l, w.x + 18, top - 52 - i * 22, (i ? "400 " : "700 ") + "13px -apple-system, sans-serif", i ? "#4a5470" : "#1f2f52", "left"));
+}
+function draw() {
+  ctx.setTransform(DPR, 0, 0, -DPR, 0, H * DPR); ctx.clearRect(0, 0, W, H);
+  const flakes = (L) => { for (const f of layers[L]) { ctx.globalAlpha = f.alpha; if (f.tex === T.crystal) { ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.rot); ctx.drawImage(f.tex, -f.size / 2, -f.size / 2, f.size, f.size); ctx.restore(); } else ctx.drawImage(f.tex, f.x - f.size / 2, f.y - f.size / 2, f.size, f.size); } ctx.globalAlpha = 1; };
+  flakes(0);
+  // ground drift
+  if (drift.length > 2) {
+    ctx.beginPath(); ctx.moveTo(-4, -4); ctx.lineTo(-4, drift[0]);
+    for (let i = 1; i < drift.length - 1; i++) ctx.quadraticCurveTo(i * COL, drift[i], (i + .5) * COL, (drift[i] + drift[i + 1]) / 2);
+    ctx.lineTo(W + 4, drift[drift.length - 1]); ctx.lineTo(W + 4, -4); ctx.closePath();
+    const g = ctx.createLinearGradient(0, 64, 0, 0); g.addColorStop(0, "#fff"); g.addColorStop(.35, "#f2f7ff"); g.addColorStop(1, "#ccdef5");
+    ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = PAL.rim; ctx.lineWidth = 1.3; ctx.stroke();
+  }
+  for (const s of sparkles) if (s.t > 0) { const k = Math.sin(Math.PI * s.t / s.dur); ctx.save(); ctx.globalCompositeOperation = "lighter"; sprite(T.sparkle, s.x, s.y, 14 * (.4 + k * .8), 14 * (.4 + k * .8), s.t * .8, k * .95); ctx.restore(); }
+  for (const f of footprints) sprite(T.foot, f.x, driftAt(f.x) * .85 + 1, 22, 12, 0, Math.max(0, 1 - f.age / 16));
+  for (const st of stacks) for (const b of st.balls) sprite(T.snowball, b.x, b.y, b.r * 2, b.r * 2, b.rot);
+  for (const s of built) s.draw();
+  if (S.showSnowman) snowman.draw();
+  yeti.draw();
+  ctx.globalAlpha = 1;
+  for (const f of layers[1]) { ctx.globalAlpha = f.alpha; if (f.tex === T.crystal) { ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.rot); ctx.drawImage(f.tex, -f.size / 2, -f.size / 2, f.size, f.size); ctx.restore(); } else ctx.drawImage(f.tex, f.x - f.size / 2, f.y - f.size / 2, f.size, f.size); }
+  ctx.globalAlpha = 1;
+  for (const p of particles) if (!p.z) { ctx.globalAlpha = Math.max(0, p.life / p.max) * .95; ctx.drawImage(T.dot, p.x - p.size / 2, p.y - p.size / 2, p.size, p.size); }
+  ctx.globalAlpha = 1;
+  for (const c of clumps) sprite(T.snowball, c.x, c.y, c.r * 2, c.r * 2, c.rot);
+  if (plough) drawPlough(plough);
+  // pretend windows and Dock, with their piles of snow
+  if (dock) {
+    ctx.save(); ctx.shadowColor = "rgba(0,0,0,.25)"; ctx.shadowBlur = 20; ctx.fillStyle = "rgba(255,255,255,.26)"; rrect(dock.minX, 6, dock.maxX - dock.minX, dock.h, 18 * UI); ctx.fill(); ctx.restore();
+    ctx.strokeStyle = "rgba(255,255,255,.45)"; ctx.lineWidth = 1; ctx.stroke();
+    const n = 7, tile = dock.h - 14 * UI, gap = ((dock.maxX - dock.minX) - n * tile) / (n + 1), cols = [["#5ab0ff", "#2563eb"], ["#5be38b", "#16a34a"], ["#ffd36b", "#f59e0b"], ["#ff8fb1", "#e11d48"], ["#c4a1ff", "#7c3aed"], ["#7ee7f2", "#0891b2"], ["#ffffff", "#c7d2e3"]];
+    cols.forEach(([a, b], i) => { const x = dock.minX + gap + i * (tile + gap), y = 6 + 7 * UI, g = ctx.createLinearGradient(0, y + tile, 0, y); g.addColorStop(0, a); g.addColorStop(1, b); ctx.fillStyle = g; rrect(x, y, tile, tile, tile * .23); ctx.fill(); circle(x + tile / 2, y + tile / 2, tile * .2, "rgba(255,255,255,.8)"); });
+    pileOn(dock.minX, dock.h + 6, dock.heights, dock.maxX);
+  }
+  for (const w of windows) if (w.open) { drawWindow(w); pileOn(w.x, winTop(w), w.heights, w.x + w.w); }
+  // in front of everything: near flakes, flying snowballs, splats on the glass, bubbles
+  for (const p of particles) if (p.z) { ctx.globalAlpha = Math.max(0, p.life / p.max) * .95; ctx.drawImage(T.dot, p.x - p.size / 2, p.y - p.size / 2, p.size, p.size); }
+  ctx.globalAlpha = 1;
+  flakes(2);
+  for (const t of throwsInFlight) if (t.x !== undefined) sprite(T.snowball, t.x, t.y, t.size * t.scale, t.size * t.scale, t.rot);
+  for (const s of splats) {
+    const k = s.wipe >= 0 ? 1 - s.wipe / .2 : s.t > 2.8 ? 1 - Math.min(1, (s.t - 2.8) / 3.2) : 1;
+    const sc = splatScale(s); ctx.save(); ctx.translate(s.x, s.y - slideOf(s)); ctx.rotate(s.rot);
+    ctx.scale(sc * (s.wipe >= 0 ? 1 + s.wipe * 1.7 : 1), sc * (s.wipe >= 0 ? 1 - s.wipe * 2 : 1)); sprite(s.img, 0, 0, s.size, s.size, 0, k); ctx.restore();
+  }
+  for (const b of bubbles) {
+    const t = b.t, sc = t < .14 ? lerp(.2, 1.08, t / .14) : t < .22 ? lerp(1.08, 1, (t - .14) / .08) : 1, a = t < .1 ? t / .1 : t > 1.9 ? 1 - (t - 1.9) / .35 : 1;
+    ctx.save(); ctx.globalAlpha = clamp(a, 0, 1); ctx.translate(b.x, b.y + (t > 1.9 ? (t - 1.9) * 28 : 0)); ctx.scale(sc, sc);
+    ctx.font = "800 15px 'Avenir Next', ui-rounded, 'SF Pro Rounded', -apple-system, sans-serif"; const w = Math.max(56, ctx.measureText(b.str).width + 28), h = 32;
+    ctx.beginPath(); ctx.moveTo(4, 0); ctx.arcTo(w / 2, 0, w / 2, h, 13); ctx.arcTo(w / 2, h, -w / 2, h, 13); ctx.arcTo(-w / 2, h, -w / 2, 0, 13); ctx.arcTo(-w / 2, 0, w / 2, 0, 13); ctx.lineTo(-10, 0); ctx.lineTo(-15, -11); ctx.closePath();
+    ctx.fillStyle = "#fff"; ctx.shadowColor = "rgba(20,40,90,.25)"; ctx.shadowBlur = 8; ctx.fill(); ctx.shadowColor = "transparent"; ctx.strokeStyle = PAL.rim; ctx.lineWidth = 1.6; ctx.stroke();
+    text(b.str, 0, h / 2, ctx.font, PAL.ink); ctx.restore();
+  }
+}
+
+// ---------- menu ----------
+const $ = id => document.getElementById(id), panel = $("panel");
+function words() {
+  $("nSnow").textContent = S.snowfall < 1 ? "off" : S.snowfall < 140 ? "light" : S.snowfall < 340 ? "steady" : "blizzard";
+  $("nWind").textContent = S.wind < .05 ? "calm" : S.wind < .8 ? "breeze" : S.wind < 1.6 ? "windy" : "gale";
+  $("nSize").textContent = S.flakeSize < .85 ? "tiny" : S.flakeSize < 1.25 ? "normal" : "big";
+  const n = displayName(); $("title").textContent = n ? `${n}'s Snow` : "Snow Day";
+  const st = S.paused ? "Paused" : S.snowfall < 1 ? "No snow right now" : S.snowfall < 140 ? "Light snow" : S.snowfall < 340 ? "Steady snow" : "Blizzard!";
+  $("status").textContent = st; $("menuWord").textContent = st;
+  $("pause").textContent = $("pauseTop").textContent = S.paused ? "Resume" : "Pause";
+  $("callYeti").disabled = !S.yetiEnabled; document.body.classList.toggle("no-cabin", !S.cabin);
+  document.body.classList.toggle("still", !S.animated);
+  const v = $("house"); if (v) { if (S.animated && S.cabin && !S.paused) v.play().catch(() => {}); else v.pause(); }
+}
+["snowfall", "wind", "flakeSize"].forEach(k => { const el = $(k); el.value = S[k]; el.addEventListener("input", () => { S[k] = parseFloat(el.value); store.set(k, S[k]); words(); }); });
+["clickSnowballs", "showSnowman", "yetiEnabled", "cabin", "animated"].forEach(k => { const el = $(k); el.checked = S[k]; el.addEventListener("change", () => { S[k] = el.checked; store.set(k, S[k]); words(); }); });
+$("name").value = S.name; $("name").addEventListener("input", e => { S.name = e.target.value; store.set("name", S.name); words(); });
+$("blizzard").onclick = () => { blizzardT = 24; gustTimer = 0; };
+$("ball").onclick = () => { const st = newStack(clamp(W * .38 + rnd(-80, 80), 40, W - 40), 13); burst(st.balls[0].x, st.balls[0].y, 10, 100); };
+$("plough").onclick = () => { if (!plough) { plough = { x: -110, y: 0, clock: 0, wheel: 0, waveRot: 0, collected: 0 }; ploughFront = -200; } };
+$("callYeti").onclick = () => yeti.summon();
+$("newWin").onclick = () => { const closed = windows.find(w => !w.open); if (closed) { closed.open = true; windows = windows.filter(w => w !== closed).concat([closed]); } else if (windows.length < 4) openWindow(); };
+const togglePause = () => { S.paused = !S.paused; words(); };
+$("pause").onclick = togglePause; $("pauseTop").onclick = togglePause;
+function closePanel() { panel.hidden = true; $("flakeBtn").classList.remove("on"); }
+$("flakeBtn").onclick = e => { e.stopPropagation(); panel.hidden = !panel.hidden; $("flakeBtn").classList.toggle("on", !panel.hidden); hideHint(); };
+const tick = () => { $("clock").textContent = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); }; tick(); setInterval(tick, 10000);
+let hintTimer = setTimeout(hideHint, 9000); function hideHint() { clearTimeout(hintTimer); $("hint").style.opacity = 0; }
+document.addEventListener("keydown", e => { if (e.key === " " && document.activeElement !== $("name")) { e.preventDefault(); togglePause(); } });
+
+// ---------- go ----------
+resize();
+snowman = new Snowman({ scarf: 0, hat: 0 }, UI); snowman.x = homeX(); snowman.y = groundUnder(snowman.x, 40);
+yeti = new Yeti(); yeti.scale = UI;
+for (let i = 0; i < 16; i++) sparkles.push({ x: 0, y: 0, t: -rnd(0, 3), dur: 1 });
+loadBuilt(); words();
+addEventListener("resize", resize);
+requestAnimationFrame(frame);
+window.__snow = { get windows() { return windows; }, get stacks() { return stacks; }, get built() { return built; }, H: () => H, summonYeti: () => yeti.summon(), get yeti() { return yeti; }, get snowman() { return snowman; }, step, throwAtGlass, splat, completeSnowman, newStack, tryMerge, startPlough: () => $("plough").onclick(), blizzard: () => $("blizzard").onclick() };
+</script>
+</body>
+</html>
