@@ -42,6 +42,20 @@ Menu bar snowflake: snowfall, wind, and flake size sliders, the buttons
 above, snowman and yeti switches, animated house, house wallpaper, open at
 login, the name the snowman says hi to, Pause, Quit.
 
+## Updates (from GitHub)
+
+One-time setup on her Mac, in Terminal:
+
+    git clone https://github.com/emdeetwo/Stella-Snow.git ~/StellaSnow
+    bash ~/StellaSnow/install.sh
+
+(It asks for a username and password: the username is `emdeetwo`, the
+password is a read-only access token for this repo. macOS remembers it.)
+
+After that, every update is one command:
+
+    bash ~/StellaSnow/update.sh
+
 ## Get it running (Terminal, no App Store)
 
 First, check what her Mac has. In Terminal:
