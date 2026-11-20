@@ -1,4 +1,4 @@
-# Stella's Snow 2.0
+# Stella's Snow 3.0
 
 A menu bar app for macOS that turns the desktop into a snow day. Built in
 Swift with SpriteKit. No network, no analytics, no ads, no permissions to
@@ -34,6 +34,27 @@ grant.
   growing wave of snow, and shakes the snow off the windows as it passes.
 - **Let it snow!** A 20-second blizzard.
 
+- **December presents.** Every day from Dec 1 to 25 a wrapped present
+  waits on the snow (missed days wait too). Unwrapping gives something new:
+  hats, glasses, bow ties, or decorations like a little tree, an igloo, a
+  snow puppy, and a golden star on Christmas.
+- **The closet.** Click the wooden trunk on the snow. Drag hats, glasses
+  and bow ties onto any snowman; drag decorations onto the snow. With the
+  closet open, drag something off a snowman to take it back.
+- **Snowball fight.** Hit the yeti and he fights back, throwing at the
+  pointer (dodge!). He ducks behind snowmen. 40 seconds, first to 7 wins.
+- **Frost.** Leave the Mac alone for a minute and frost creeps in from
+  the edges of the screen. Draw in it with the pointer.
+- **Snow globe.** Shake the pointer back and forth fast.
+- **Friends.** A penguin pops up on a window and belly-slides off it; a
+  cardinal lands on the snow and flies off if the pointer gets close.
+- **Badges.** 18 to earn, shown in the menu, celebrated when earned.
+- **Special days.** Christmas Eve night: Santa's sleigh crosses the sky.
+  Christmas morning: a Merry Christmas greeting. Dec 26: birthday confetti,
+  balloons to pop, a party hat, and the yeti brings a cake. New Year's Eve:
+  fireworks, with a finale at midnight.
+- **Sneak peeks.** Hold Option while clicking the snowflake to preview any
+  of the above.
 - **The animated house.** The holiday house loop plays behind the desktop
   icons (the tree glows red, then green). Its first frame is also set as the
   real wallpaper, so the Mac still looks right when the app is quit.

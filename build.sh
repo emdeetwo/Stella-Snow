@@ -13,12 +13,13 @@ if ! xcode-select -p >/dev/null 2>&1; then
 fi
 
 SRC=(StellaSnowApp.swift SnowScene.swift SnowmanNode.swift YetiNode.swift PloughNode.swift
-     OverlayWindow.swift Settings.swift ControlsView.swift WindowTracker.swift Textures.swift Art.swift)
+     OverlayWindow.swift Settings.swift ControlsView.swift WindowTracker.swift Textures.swift Art.swift
+     Progress.swift Accessories.swift Festive.swift Frost.swift Friends.swift)
 FW=(-framework AppKit -framework SpriteKit -framework SwiftUI -framework ServiceManagement -framework AVFoundation)
 APP="StellaSnow.app"
 TMP="$(mktemp -d)"
 
-echo "Building Stella's Snow (about a minute)..."
+echo "Building Stella's Snow (a minute or two)..."
 built=()
 for arch in arm64 x86_64; do
   if swiftc -O -swift-version 5 -parse-as-library -target "$arch-apple-macos14.0" \

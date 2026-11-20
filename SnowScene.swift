@@ -139,8 +139,56 @@ final class SnowScene: SKScene {
         case roll(Stack)
         case slide(Stack, offset: CGFloat)
         case snowman(SnowmanNode, offset: CGFloat)
+        case decor(DecorNode, offset: CGFloat)
     }
     private var drag: Drag?
+
+    // MARK: festive state
+
+    let frost = FrostLayer(color: .clear, size: CGSize(width: 1, height: 1))
+    private var lastActivity: CGFloat = 0
+    private var frostCounted = false
+    private var presents: [PresentNode] = []
+    private var decor: [DecorNode] = []
+    private var balloons: [BalloonNode] = []
+    private var confetti: [Flake] = []
+    private var sparks: [Flake] = []
+    private var rockets: [Flake] = []
+    private var sleigh: SleighNode?
+    private var sleighBaseY: CGFloat = 0
+    private var sleighT: CGFloat = 0
+    private var nextSleigh: CGFloat = 10
+    private var nextFirework: CGFloat = 3
+    private var nextBalloon: CGFloat = 4
+    private var confettiDebt: CGFloat = 0
+    private var penguin: PenguinNode?
+    private var cardinal: CardinalNode?
+    private var nextPenguin = CGFloat.random(in: 70...130)
+    private var nextCardinal = CGFloat.random(in: 40...90)
+    private var festiveTick: CGFloat = 0
+    private var previewBirthdayT: CGFloat = 0
+    private var previewFireworksT: CGFloat = 0
+    private var birthdayGreetIn: CGFloat = 0
+    private let trunk = TrunkNode()
+    private let tray = ClosetTray()
+    private var closetOpen = false
+    private var carried: (item: Item, node: SKNode)?
+    private var fight: (her: Int, yeti: Int, time: CGFloat)?
+    private var scoreboard: Scoreboard?
+    private var shakeFlips: [CGFloat] = []
+    private var lastShakeSign: CGFloat = 0
+    private var globeT: CGFloat = 0
+    private var badgeQueue: [Badge] = []
+    private var toastBusy: CGFloat = 0
+    private var bdayNow = false
+    private var sleighNow = false
+    private var nyeNow = false
+    private var midnightNow = false
+
+    private struct SavedDecor: Codable {
+        var item: Item
+        var x: Double
+    }
 
     private struct SavedSnowman: Codable {
         var x: Double
@@ -156,7 +204,7 @@ final class SnowScene: SKScene {
         backgroundColor = .clear
         anchorPoint = .zero
         isUserInteractionEnabled = true
-        snowman = SnowmanNode(host: self, outfit: .classic)
+        snowman = SnowmanNode(host: self, outfit: SnowScene.loadMainOutfit())
         yeti = YetiNode(host: self)
     }
 
@@ -193,10 +241,12 @@ final class SnowScene: SKScene {
         refreshLedges()
         syncFlakes()
         rebuildDriftPath()
+        setupFestive()
     }
 
     override func didChangeSize(_ oldSize: CGSize) {
         guard !drift.isEmpty else { return }
+        frost.setup(size: size)
         let n = Int(ceil(size.width / colWidth)) + 2
         drift = (0..<n).map { i in
             let src = Int(CGFloat(i) * CGFloat(drift.count - 1) / CGFloat(max(1, n - 1)))
@@ -235,7 +285,23 @@ final class SnowScene: SKScene {
             pointerVel.dx += (dx / max(dt, 0.001) - pointerVel.dx) * k
             pointerVel.dy += (dy / max(dt, 0.001) - pointerVel.dy) * k
         }
-        if abs(dx) + abs(dy) > 0.5 { pointerMovedAt = clock }
+        if abs(dx) + abs(dy) > 0.5 {
+            pointerMovedAt = clock
+            lastActivity = clock
+        }
+        // Shake the pointer hard left-right a few times: snow globe!
+        if abs(pointerVel.dx) > 1100 {
+            let sign: CGFloat = pointerVel.dx > 0 ? 1 : -1
+            if sign != lastShakeSign {
+                lastShakeSign = sign
+                shakeFlips.append(clock)
+            }
+        }
+        shakeFlips.removeAll { clock - $0 > 1.1 }
+        if shakeFlips.count >= 5 && globeT <= 0 {
+            shakeFlips.removeAll()
+            startGlobe()
+        }
         pointer = p
     }
 
@@ -244,6 +310,12 @@ final class SnowScene: SKScene {
     private func isInteractive(_ p: CGPoint) -> Bool {
         guard p.x >= 0, p.y >= 0, p.x <= size.width, p.y <= size.height else { return false }
         if splatAt(p) != nil { return true }
+        if closetOpen && tray.bounds.contains(p) { return true }
+        if trunk.hit(p) { return true }
+        if presents.contains(where: { $0.hit(p) }) { return true }
+        if balloons.contains(where: { $0.hit(p) }) { return true }
+        if decor.contains(where: { $0.hit(p) }) { return true }
+        if let pg = penguin, pg.hit(p) { return true }
         if built.contains(where: { $0.hit(p) }) { return true }
         if settings.showSnowman && snowman.hit(p) { return true }
         if yeti.hit(p) { return true }
@@ -252,7 +324,7 @@ final class SnowScene: SKScene {
     }
 
     private func updateMouseCapture() {
-        let want = drag != nil || isInteractive(pointer)
+        let want = drag != nil || carried != nil || isInteractive(pointer)
         if want != capturing {
             capturing = want
             overlay?.ignoresMouseEvents = !want
@@ -262,16 +334,55 @@ final class SnowScene: SKScene {
     func releaseMouse() {
         capturing = false
         drag = nil
+        if let c = carried {
+            c.node.removeFromParent()
+            carried = nil
+        }
         overlay?.ignoresMouseEvents = true
     }
 
     override func mouseDown(with event: NSEvent) { press(event.location(in: self)) }
     override func mouseDragged(with event: NSEvent) { dragTo(event.location(in: self)) }
-    override func mouseUp(with event: NSEvent) { release() }
+    override func mouseUp(with event: NSEvent) { release(at: event.location(in: self)) }
 
     private func press(_ p: CGPoint) {
+        lastActivity = clock
         if let s = splatAt(p) {
             wipe(s)
+            return
+        }
+        if closetOpen, let item = tray.item(at: p) {
+            pickUp(item, at: p)
+            return
+        }
+        if closetOpen && tray.bounds.contains(p) { return }
+        if trunk.hit(p) {
+            toggleCloset()
+            return
+        }
+        if let pr = presents.first(where: { $0.hit(p) }) {
+            openPresent(pr)
+            return
+        }
+        if let b = balloons.first(where: { $0.hit(p) }) {
+            pop(b)
+            return
+        }
+        if let pg = penguin, pg.hit(p) {
+            pg.tickle()
+            return
+        }
+        if closetOpen {
+            for s in dressableSnowmen.reversed() {
+                if let item = s.takeOff(at: p) {
+                    saveOutfits()
+                    pickUp(item, at: p)
+                    return
+                }
+            }
+        }
+        if let d = decor.last(where: { $0.hit(p) }) {
+            drag = .decor(d, offset: d.position.x - p.x)
             return
         }
         if let b = built.last(where: { $0.hit(p) }) {
@@ -299,6 +410,10 @@ final class SnowScene: SKScene {
     }
 
     private func dragTo(_ p: CGPoint) {
+        if let c = carried {
+            c.node.position = p
+            return
+        }
         guard let d = drag else { return }
         switch d {
         case .roll(let st):
@@ -322,13 +437,30 @@ final class SnowScene: SKScene {
             layout(st)
         case .snowman(let s, let offset):
             s.position.x = clamp(p.x + offset, -30, size.width + 30)
+        case .decor(let n, let offset):
+            n.position.x = clamp(p.x + offset, -20, size.width + 20)
+            n.position.y = groundLevel(at: n.position.x)
         }
     }
 
-    private func release() {
+    private func release(at p: CGPoint) {
+        if let c = carried {
+            drop(c.item, at: p)
+            c.node.removeFromParent()
+            carried = nil
+            return
+        }
         guard let d = drag else { return }
         drag = nil
         switch d {
+        case .decor(let n, _):
+            if n.position.x < 24 || n.position.x > size.width - 24 {
+                burst(at: CGPoint(x: n.position.x, y: n.position.y + 20), count: 16, spread: 140)
+                n.removeFromParent()
+                decor.removeAll { $0 === n }
+                if closetOpen { reloadTray() }
+            }
+            saveDecor()
         case .roll(let st), .slide(let st, _):
             tryMerge(st)
         case .snowman(let s, _):
@@ -428,6 +560,7 @@ final class SnowScene: SKScene {
         addChild(s)
         built.append(s)
         removeStack(st, puff: false)
+        SnowProgress.shared.bump(.snowmenBuilt)
         burst(at: CGPoint(x: x, y: s.position.y + 90 * s.figureScale), count: 34, spread: 240)
         let name = settings.displayName
         say(name.isEmpty ? "Thank you!" : "Thanks, \(name)!",
@@ -475,6 +608,7 @@ final class SnowScene: SKScene {
     func startBlizzard() {
         blizzardT = 24
         gustTimer = 0
+        SnowProgress.shared.bump(.blizzards)
     }
 
     func startPlough() {
@@ -485,6 +619,7 @@ final class SnowScene: SKScene {
         addChild(p)
         plough = p
         ploughFront = -200
+        SnowProgress.shared.bump(.ploughs)
     }
 
     // MARK: - hooks for the characters
@@ -559,13 +694,14 @@ final class SnowScene: SKScene {
         addChild(n)
         throwsInFlight.append(Throw(node: n, p0: start, p1: mid, p2: target, u: 0, dur: 0.42,
                                     s0: 2.6, s1: 0.55, atGlass: false))
+        SnowProgress.shared.bump(.snowballsThrown)
     }
 
     /// The yeti throws at you: the ball starts small in his paw and grows
     /// as it comes at the screen, then splats on the glass.
-    func throwAtGlass(from: CGPoint) {
-        let target = CGPoint(x: CGFloat.random(in: size.width * 0.12...size.width * 0.88),
-                             y: CGFloat.random(in: size.height * 0.32...size.height * 0.80))
+    func throwAtGlass(from: CGPoint, target aim: CGPoint? = nil) {
+        let target = aim ?? CGPoint(x: CGFloat.random(in: size.width * 0.12...size.width * 0.88),
+                                    y: CGFloat.random(in: size.height * 0.32...size.height * 0.80))
         let mid = CGPoint(x: (from.x + target.x) / 2, y: max(from.y, target.y) + 200)
         let n = Art.sprite(Tex.snowball, 20, 20, at: from)
         n.zPosition = 55
@@ -633,6 +769,7 @@ final class SnowScene: SKScene {
 
     /// Click a splat to wipe it off the screen.
     private func wipe(_ s: SKSpriteNode) {
+        SnowProgress.shared.bump(.splatsWiped)
         splats.removeAll { $0 === s }
         s.removeAllActions()
         burst(at: s.position, count: 14, spread: 160)
@@ -861,6 +998,13 @@ final class SnowScene: SKScene {
                 f.position.x += (wind * sp.windMul + sway + f.vx) * dt
                 f.vx *= damp
                 f.zRotation += f.spin * dt
+                if globeT > 0 {
+                    // Snow globe: everything swirls around the middle of the screen.
+                    let k = min(1, globeT / 1.2) * 2.2
+                    let cx = size.width / 2, cy = size.height / 2
+                    f.vx += -(f.position.y - cy) * k * dt + CGFloat.random(in: -30...30) * dt * 10
+                    f.vy += (f.position.x - cx) * k * dt * 0.6 + f.term * dt * 2.4
+                }
 
                 // Moving the pointer fast through the snow scatters it.
                 if layer > 0 && pushOn && pSpeed > 40 {
@@ -957,7 +1101,16 @@ final class SnowScene: SKScene {
             if u >= 1 {
                 t.node.removeFromParent()
                 throwsInFlight.remove(at: i)
-                if t.atGlass { splat(at: t.p2) } else { impact(t.p2) }
+                if t.atGlass {
+                    splat(at: t.p2)
+                    if fight != nil, inBounds, hypot(pointer.x - t.p2.x, pointer.y - t.p2.y) < 90 {
+                        fight?.yeti += 1
+                        say(["Got you!", "Bullseye!", "Ha ha!"].randomElement() ?? "Got you!",
+                            at: CGPoint(x: t.p2.x, y: t.p2.y + 70))
+                    }
+                } else {
+                    impact(t.p2)
+                }
                 continue
             }
             throwsInFlight[i] = t
@@ -1097,7 +1250,14 @@ final class SnowScene: SKScene {
             snowman.update(dt: dt, pointer: look, wind: wind)
             if greetIn > 0 {
                 greetIn -= dt
-                if greetIn <= 0 { snowman.greet(settings.displayName) }
+                if greetIn <= 0 {
+                    if Holiday.month == 12 && Holiday.day == 25 {
+                        let n = settings.displayName
+                        say(n.isEmpty ? "Merry Christmas!" : "Merry Christmas, \(n)!", at: snowmanMouth)
+                    } else {
+                        snowman.greet(settings.displayName)
+                    }
+                }
             }
         }
         for s in built {
@@ -1202,8 +1362,644 @@ final class SnowScene: SKScene {
         updateFootprints(dt)
         updatePlough(dt)
         updateCharacters(dt)
+        updateFestive(dt)
         rebuildDriftPath()
         rebuildLedgePaths()
         updateMouseCapture()
+    }
+}
+
+
+// MARK: - Festive: closet, presents, frost, sleigh, fireworks, birthday,
+// friends, snowball fight, badges, snow globe
+
+extension SnowScene {
+
+    private static let partyColors: [NSColor] = [
+        Palette.c(0.95, 0.25, 0.30), Palette.c(0.98, 0.78, 0.20), Palette.c(0.25, 0.60, 0.98),
+        Palette.c(0.30, 0.80, 0.45), Palette.c(0.97, 0.45, 0.70), Palette.c(0.62, 0.40, 0.95),
+    ]
+
+    // MARK: setup and saving
+
+    static func loadMainOutfit() -> SnowmanOutfit {
+        guard let data = UserDefaults.standard.data(forKey: "mainOutfit"),
+              let o = try? JSONDecoder().decode(SnowmanOutfit.self, from: data) else { return .classic }
+        return o
+    }
+
+    private func saveOutfits() {
+        if let data = try? JSONEncoder().encode(snowman.outfit) {
+            UserDefaults.standard.set(data, forKey: "mainOutfit")
+        }
+        saveBuilt()
+    }
+
+    private var dressableSnowmen: [SnowmanNode] {
+        (settings.showSnowman ? [snowman] : []) + built
+    }
+
+    private var snowmanMouth: CGPoint {
+        CGPoint(x: snowman.position.x + 26 * snowman.figureScale, y: snowman.position.y + 192 * snowman.figureScale)
+    }
+
+    func groundLevel(at x: CGFloat) -> CGFloat { driftAt(x) * 0.85 }
+
+    private func setupFestive() {
+        frost.setup(size: size)
+        frost.zPosition = 70
+        frost.alpha = 0.95
+        addChild(frost)
+        trunk.position = CGPoint(x: 46, y: groundLevel(at: 46))
+        trunk.zPosition = 6
+        addChild(trunk)
+        tray.zPosition = 34
+        tray.isHidden = true
+        addChild(tray)
+        loadDecor()
+        SnowProgress.shared.onBadge = { [weak self] b in self?.badgeQueue.append(b) }
+        festiveTick = 0
+    }
+
+    private func saveDecor() {
+        let w = max(1, size.width)
+        let saved = decor.map { SavedDecor(item: $0.item, x: Double($0.position.x / w)) }
+        if let data = try? JSONEncoder().encode(saved) { UserDefaults.standard.set(data, forKey: "decor") }
+    }
+
+    private func loadDecor() {
+        guard let data = UserDefaults.standard.data(forKey: "decor"),
+              let saved = try? JSONDecoder().decode([SavedDecor].self, from: data) else { return }
+        for d in saved { placeDecor(d.item, x: CGFloat(d.x) * size.width, save: false) }
+    }
+
+    private func placeDecor(_ item: Item, x: CGFloat, save: Bool) {
+        let n = DecorNode(item: item)
+        n.position = CGPoint(x: clamp(x, 30, size.width - 30), y: groundLevel(at: x))
+        n.zPosition = 5.5
+        n.setScale(0.2)
+        n.run(SKAction.scale(to: 1, duration: 0.25))
+        addChild(n)
+        decor.append(n)
+        if save { saveDecor() }
+    }
+
+    // MARK: closet
+
+    func toggleCloset() {
+        closetOpen.toggle()
+        trunk.setOpen(closetOpen)
+        tray.isHidden = !closetOpen
+        if closetOpen {
+            reloadTray()
+            tray.setScale(0.6)
+            tray.run(SKAction.scale(to: 1, duration: 0.15))
+        }
+    }
+
+    private func reloadTray() {
+        let all = SnowProgress.shared.unlocked
+        let wearables = all.filter { $0.slot != .decor }
+        let placed = Set(decor.map { $0.item })
+        let decorations = all.filter { $0.slot == .decor && !placed.contains($0) }
+        tray.reload(wearables + decorations)
+        tray.position = CGPoint(x: 14, y: max(groundLevel(at: 60) + 56, 74))
+    }
+
+    private func pickUp(_ item: Item, at p: CGPoint) {
+        let node = ItemArt.icon(item, fit: 50)
+        node.position = p
+        node.zPosition = 50
+        node.setScale(1.15)
+        addChild(node)
+        carried = (item: item, node: node)
+    }
+
+    private func drop(_ item: Item, at p: CGPoint) {
+        if item.slot == .decor {
+            if !decor.contains(where: { $0.item == item }) && !(closetOpen && tray.bounds.contains(p)) {
+                placeDecor(item, x: p.x, save: true)
+            }
+        } else if let s = dressableSnowmen.reversed().first(where: { $0.catches(p) }) {
+            s.wear(item)
+            SnowProgress.shared.bump(.outfits)
+            saveOutfits()
+            burst(at: p, count: 12, spread: 120)
+        }
+        if closetOpen { reloadTray() }
+    }
+
+    // MARK: December presents
+
+    private func refreshPresents() {
+        for d in SnowProgress.shared.unopenedDays.prefix(3) where !presents.contains(where: { $0.day == d }) {
+            spawnPresent(day: d)
+        }
+    }
+
+    private func spawnPresent(day: Int) {
+        var x = size.width * 0.4
+        for _ in 0..<10 {
+            x = CGFloat.random(in: size.width * 0.12...size.width * 0.72)
+            let clear = presents.allSatisfy { abs($0.position.x - x) > 80 } && abs(snowman.position.x - x) > 110
+            if clear { break }
+        }
+        let pr = PresentNode(day: day)
+        pr.position = CGPoint(x: x, y: groundLevel(at: x))
+        pr.zPosition = 6
+        pr.setScale(0.1)
+        pr.run(SKAction.scale(to: 1, duration: 0.3))
+        addChild(pr)
+        presents.append(pr)
+    }
+
+    private func openPresent(_ pr: PresentNode) {
+        let day = pr.day
+        let item: Item? = day > 0 ? SnowProgress.shared.open(day: day) : Item.advent.values.randomElement()
+        presents.removeAll { $0 === pr }
+        pr.unwrap()
+        let at = CGPoint(x: pr.position.x, y: pr.position.y + 30)
+        for _ in 0..<26 {
+            let a = CGFloat.random(in: 0...(2 * .pi)), v = CGFloat.random(in: 60...220)
+            spark(at: at, v: CGVector(dx: cos(a) * v, dy: sin(a) * v + 80), color: ItemArt.gold,
+                  size: CGFloat.random(in: 5...9), life: CGFloat.random(in: 0.6...1.1), gravity: 120, z: 30)
+        }
+        pr.run(SKAction.sequence([
+            SKAction.wait(forDuration: 0.45),
+            SKAction.run { [weak self, weak pr] in
+                guard let self = self, let pr = pr, let item = item else { return }
+                self.say(day > 0 ? "Day \(day): \(item.title)!" : "\(item.title)!",
+                         at: CGPoint(x: pr.position.x, y: pr.position.y + 96))
+                self.confettiBurst(at: CGPoint(x: pr.position.x, y: pr.position.y + 40), count: 30)
+                if item.slot == .decor {
+                    self.placeDecor(item, x: pr.position.x, save: day > 0)
+                } else if self.settings.showSnowman {
+                    self.snowman.wear(item)
+                    if day > 0 { self.saveOutfits() }
+                }
+                if self.closetOpen { self.reloadTray() }
+            },
+            SKAction.wait(forDuration: 1.0),
+            SKAction.removeFromParent(),
+        ]))
+    }
+
+    // MARK: perches for the friends
+
+    func perches(minWidth: CGFloat, includeDock: Bool) -> [Perch] {
+        ledges.compactMap { id, l in
+            guard includeDock || id != -1, l.maxX - l.minX >= minWidth, l.topY > 100, l.topY < size.height - 120 else { return nil }
+            return Perch(id: id, minX: max(l.minX, 10), maxX: min(l.maxX, size.width - 10), topY: l.topY)
+        }
+    }
+
+    func perch(id: Int) -> Perch? {
+        guard let l = ledges[id] else { return nil }
+        return Perch(id: id, minX: l.minX, maxX: l.maxX, topY: l.topY)
+    }
+
+    func perchSnow(id: Int, x: CGFloat) -> CGFloat {
+        guard let l = ledges[id], !l.heights.isEmpty else { return 0 }
+        let c = min(max(Int((x - l.minX) / colWidth), 0), l.heights.count - 1)
+        return l.heights[c]
+    }
+
+    private func spawnPenguin() {
+        guard penguin == nil else { return }
+        let p = PenguinNode(host: self)
+        p.zPosition = 7.5
+        addChild(p)
+        p.start(on: perches(minWidth: 260, includeDock: false).randomElement())
+        penguin = p
+    }
+
+    private func spawnCardinal() {
+        guard cardinal == nil else { return }
+        let c = CardinalNode(host: self)
+        c.zPosition = 9
+        addChild(c)
+        let spots = perches(minWidth: 100, includeDock: true)
+        c.start(on: Int.random(in: 0..<10) < 7 ? spots.randomElement() : nil)
+        cardinal = c
+    }
+
+    // MARK: snowball fight (the yeti calls these)
+
+    func startFight() -> Bool {
+        guard fight == nil else { return false }
+        fight = (her: 0, yeti: 0, time: 40)
+        let sb = Scoreboard()
+        sb.position = CGPoint(x: size.width / 2, y: size.height - 92)
+        sb.zPosition = 75
+        sb.setScale(0.2)
+        sb.run(SKAction.scale(to: 1, duration: 0.2))
+        addChild(sb)
+        scoreboard = sb
+        return true
+    }
+
+    func yetiWasHit() {
+        fight?.her += 1
+    }
+
+    func fightThrowTarget() -> CGPoint? {
+        guard inBounds else { return nil }
+        return CGPoint(x: clamp(pointer.x + CGFloat.random(in: -40...40), 60, size.width - 60),
+                       y: clamp(pointer.y + CGFloat.random(in: -30...30), 80, size.height - 80))
+    }
+
+    func forfeitFight() {
+        fight = nil
+        scoreboard?.removeFromParent()
+        scoreboard = nil
+    }
+
+    /// Somewhere to duck behind: right up against the nearest snowman.
+    func coverX(near x: CGFloat) -> CGFloat? {
+        let near = dressableSnowmen.filter { $0.mode == .idle && abs($0.position.x - x) < 420 }
+        guard let s = near.min(by: { abs($0.position.x - x) < abs($1.position.x - x) }) else { return nil }
+        return s.position.x + (x < s.position.x ? -14 : 14) * s.figureScale
+    }
+
+    private func finishFight() {
+        guard let f = fight else { return }
+        fight = nil
+        let name = settings.displayName
+        scoreboard?.set(name: name, her: f.her, yeti: f.yeti, secondsLeft: 0)
+        let line: String
+        if f.her > f.yeti {
+            line = name.isEmpty ? "You win!" : "\(name) wins!"
+            SnowProgress.shared.bump(.fightsWon)
+            confettiBurst(at: CGPoint(x: size.width / 2, y: size.height - 100), count: 60)
+        } else if f.her == f.yeti {
+            line = "It's a tie!"
+        } else {
+            line = "Yeti wins! Rematch?"
+        }
+        say(line, at: CGPoint(x: size.width / 2, y: size.height - 160))
+        yeti.endFight()
+        scoreboard?.run(SKAction.sequence([
+            SKAction.wait(forDuration: 3),
+            SKAction.fadeOut(withDuration: 0.4),
+            SKAction.removeFromParent(),
+        ]))
+        scoreboard = nil
+    }
+
+    // MARK: birthday
+
+    func placeCake(x: CGFloat) {
+        if !decor.contains(where: { $0.item == .birthdayCake }) {
+            placeDecor(.birthdayCake, x: x, save: true)
+        }
+        SnowProgress.shared.unlock(.birthdayCake)
+        if previewBirthdayT <= 0 { UserDefaults.standard.set(Holiday.year, forKey: "cakeYear") }
+        confettiBurst(at: CGPoint(x: x, y: groundLevel(at: x) + 60), count: 50)
+    }
+
+    private func pop(_ b: BalloonNode) {
+        confettiBurst(at: b.position, count: 24)
+        balloons.removeAll { $0 === b }
+        b.removeFromParent()
+    }
+
+    // MARK: particles: sparks (fireworks, sleigh dust) and confetti
+
+    private func spark(at p: CGPoint, v: CGVector, color: NSColor, size s: CGFloat, life: CGFloat,
+                       gravity: CGFloat, z: CGFloat = 3) {
+        guard sparks.count < 900 else { return }
+        let f = Flake(texture: Tex.softDot)
+        f.size = CGSize(width: s, height: s)
+        f.position = p
+        f.vx = v.dx
+        f.vy = v.dy
+        f.color = color
+        f.colorBlendFactor = 1
+        f.blendMode = .add
+        f.life = life
+        f.maxLife = life
+        f.term = gravity
+        f.phase = CGFloat.random(in: 0...6)
+        f.zPosition = z
+        addChild(f)
+        sparks.append(f)
+    }
+
+    private func confettiPiece(at p: CGPoint, v: CGVector) {
+        guard confetti.count < 400, let color = SnowScene.partyColors.randomElement() else { return }
+        let f = Flake(color: color, size: CGSize(width: 5, height: 9))
+        f.position = p
+        f.vx = v.dx
+        f.vy = v.dy
+        f.term = CGFloat.random(in: 45...80)
+        f.phase = CGFloat.random(in: 0...6)
+        f.swayFreq = CGFloat.random(in: 1.5...3)
+        f.swayAmp = CGFloat.random(in: 15...40)
+        f.spin = CGFloat.random(in: -6...6)
+        f.zPosition = 13
+        addChild(f)
+        confetti.append(f)
+    }
+
+    private func confettiBurst(at p: CGPoint, count: Int) {
+        for _ in 0..<count {
+            let a = CGFloat.random(in: 0.2...(CGFloat.pi - 0.2)), v = CGFloat.random(in: 150...380)
+            confettiPiece(at: p, v: CGVector(dx: cos(a) * v, dy: sin(a) * v))
+        }
+    }
+
+    private func launchRocket() {
+        let f = Flake(texture: Tex.softDot)
+        f.size = CGSize(width: 8, height: 8)
+        f.position = CGPoint(x: CGFloat.random(in: size.width * 0.15...size.width * 0.85), y: -10)
+        f.vx = CGFloat.random(in: -30...30)
+        f.vy = CGFloat.random(in: 560...700) * max(0.8, size.height / 950)
+        f.color = Palette.c(1, 0.85, 0.5)
+        f.colorBlendFactor = 1
+        f.blendMode = .add
+        f.zPosition = 3
+        addChild(f)
+        rockets.append(f)
+    }
+
+    private func explode(at p: CGPoint) {
+        guard let color = SnowScene.partyColors.randomElement() else { return }
+        let n = 70
+        for i in 0..<n {
+            let a = CGFloat(i) / CGFloat(n) * 2 * .pi + CGFloat.random(in: -0.04...0.04)
+            let ring = Int.random(in: 0..<4) > 0
+            let v = ring ? CGFloat.random(in: 150...210) : CGFloat.random(in: 40...130)
+            spark(at: p, v: CGVector(dx: cos(a) * v, dy: sin(a) * v), color: color,
+                  size: CGFloat.random(in: 5...8), life: CGFloat.random(in: 1.3...2.1), gravity: 70)
+        }
+        spark(at: p, v: .zero, color: .white, size: 110, life: 0.25, gravity: 0)
+    }
+
+    private func launchSleigh() {
+        guard sleigh == nil else { return }
+        let n = SleighNode()
+        n.xScale = -1.2
+        n.yScale = 1.2
+        sleighBaseY = size.height * CGFloat.random(in: 0.72...0.84)
+        n.position = CGPoint(x: size.width + 220, y: sleighBaseY)
+        n.zPosition = 3
+        addChild(n)
+        sleigh = n
+        sleighT = 0
+    }
+
+    private func showToast(_ badge: Badge) {
+        let t = BadgeToast(badge)
+        t.position = CGPoint(x: size.width / 2, y: size.height + 60)
+        t.zPosition = 80
+        addChild(t)
+        let drop = SKAction.move(to: CGPoint(x: size.width / 2, y: size.height - 80), duration: 0.35)
+        drop.timingMode = .easeOut
+        t.run(SKAction.sequence([
+            drop,
+            SKAction.wait(forDuration: 3.2),
+            SKAction.group([SKAction.moveBy(x: 0, y: 120, duration: 0.35), SKAction.fadeOut(withDuration: 0.35)]),
+            SKAction.removeFromParent(),
+        ]))
+        confettiBurst(at: CGPoint(x: size.width / 2, y: size.height - 80), count: 40)
+        toastBusy = 4.1
+    }
+
+    private func startGlobe() {
+        globeT = 3.5
+        SnowProgress.shared.bump(.globes)
+        for _ in 0..<140 where particles.count < 600 {
+            let x = CGFloat.random(in: 0...size.width)
+            let f = Flake(texture: Tex.softDot)
+            let r = CGFloat.random(in: 1.5...3.5)
+            f.size = CGSize(width: r * 3, height: r * 3)
+            f.position = CGPoint(x: x, y: driftAt(x))
+            f.vx = CGFloat.random(in: -140...140)
+            f.vy = CGFloat.random(in: 300...760)
+            f.maxLife = CGFloat.random(in: 1.4...2.4)
+            f.life = f.maxLife
+            f.zPosition = 13
+            addChild(f)
+            particles.append(f)
+        }
+        for i in drift.indices { drift[i] *= 0.78 }
+        if settings.showSnowman && snowman.mode == .idle { say("Whoa!", at: snowmanMouth) }
+    }
+
+    // MARK: sneak peeks (menu, hold Option)
+
+    func previewSleigh() { launchSleigh() }
+    func previewFireworks() {
+        previewFireworksT = 25
+        nextFirework = clock
+    }
+    func previewBirthday() {
+        previewBirthdayT = 90
+        birthdayGreetIn = 0.5
+        festiveTick = 0
+        yeti.birthdayVisit = true
+        yeti.summon()
+    }
+    func previewFrost() {
+        frost.frostNow()
+        lastActivity = clock
+    }
+    func previewPresent() { spawnPresent(day: 0) }
+    func previewPenguin() {
+        nextPenguin = clock
+        spawnPenguin()
+    }
+    func previewCardinal() { spawnCardinal() }
+    func previewFight() {
+        yeti.fightOnArrival = true
+        yeti.summon()
+    }
+    func previewGlobe() { if globeT <= 0 { startGlobe() } }
+
+    // MARK: every frame
+
+    private func slowFestive() {
+        bdayNow = Holiday.isBirthday || previewBirthdayT > 0
+        sleighNow = Holiday.isSleighTime
+        nyeNow = Holiday.isNewYearsEve
+        midnightNow = Holiday.isNewYearsMidnight
+        snowman.setPartyHat(bdayNow)
+        refreshPresents()
+        if sleighNow && sleigh == nil && clock >= nextSleigh {
+            launchSleigh()
+            nextSleigh = clock + CGFloat.random(in: 150...280)
+        }
+        if bdayNow, previewBirthdayT <= 0, yeti.isAway, !yeti.birthdayVisit, settings.yetiEnabled, clock > 20,
+           UserDefaults.standard.integer(forKey: "cakeYear") != Holiday.year {
+            yeti.birthdayVisit = true
+            yeti.summon()
+        }
+        if penguin == nil && clock > nextPenguin { spawnPenguin() }
+        if cardinal == nil && clock > nextCardinal { spawnCardinal() }
+    }
+
+    private func updateFestive(_ dt: CGFloat) {
+        // Frost creeps in while the Mac sits untouched; moving the pointer wipes it.
+        let wipe: CGPoint? = (clock - pointerMovedAt < 0.05 && inBounds) ? pointer : nil
+        if frost.update(dt: dt, idle: clock - lastActivity, wipeAt: wipe) && !frostCounted {
+            frostCounted = true
+            SnowProgress.shared.bump(.frostDrawings)
+        }
+        if frost.coverage == 0 { frostCounted = false }
+
+        if globeT > 0 { globeT -= dt }
+        if previewBirthdayT > 0 { previewBirthdayT -= dt }
+        if previewFireworksT > 0 { previewFireworksT -= dt }
+
+        festiveTick -= dt
+        if festiveTick <= 0 {
+            festiveTick = 2
+            slowFestive()
+        }
+
+        trunk.position.y = groundLevel(at: trunk.position.x)
+        for d in decor { d.position.y = groundLevel(at: d.position.x) }
+        for pr in presents { pr.position.y = groundLevel(at: pr.position.x) }
+        if closetOpen { tray.position.y = max(groundLevel(at: 60) + 56, 74) }
+
+        // Birthday: confetti in the snow, balloons, a greeting.
+        if bdayNow {
+            confettiDebt += dt * 14
+            while confettiDebt >= 1 {
+                confettiDebt -= 1
+                confettiPiece(at: CGPoint(x: CGFloat.random(in: 0...size.width), y: size.height + 10),
+                              v: CGVector(dx: 0, dy: -40))
+            }
+            if clock > nextBalloon && balloons.count < 5, let color = SnowScene.partyColors.randomElement() {
+                nextBalloon = clock + CGFloat.random(in: 6...12)
+                let b = BalloonNode(color: color)
+                b.position = CGPoint(x: CGFloat.random(in: size.width * 0.1...size.width * 0.9), y: -80)
+                b.zPosition = 13
+                addChild(b)
+                balloons.append(b)
+            }
+            birthdayGreetIn -= dt
+            if birthdayGreetIn <= 0 && settings.showSnowman {
+                birthdayGreetIn = 600
+                let n = settings.displayName
+                say(n.isEmpty ? "Happy birthday!" : "Happy birthday, \(n)!", at: snowmanMouth)
+            }
+        }
+        for b in balloons {
+            b.position.y += b.speedUp * dt
+            b.position.x += sin(clock * 0.9 + b.phase) * 14 * dt
+            b.zRotation = sin(clock * 1.3 + b.phase) * 0.08
+        }
+        balloons.removeAll { b in
+            if b.position.y > size.height + 90 { b.removeFromParent(); return true }
+            return false
+        }
+        var i = 0
+        while i < confetti.count {
+            let f = confetti[i]
+            f.vy += (-f.term - f.vy) * min(1, 1.6 * dt)
+            f.vx *= max(0, 1 - 1.4 * dt)
+            f.position.x += (f.vx + sin(clock * f.swayFreq + f.phase) * f.swayAmp + wind * 0.6) * dt
+            f.position.y += f.vy * dt
+            f.zRotation += f.spin * dt
+            f.xScale = cos(clock * 6 + f.phase)
+            if f.position.y < driftAt(f.position.x) || f.position.y < -20 {
+                f.removeFromParent()
+                confetti.remove(at: i)
+                continue
+            }
+            i += 1
+        }
+
+        // Fireworks on New Year's Eve (a finale at midnight).
+        if (nyeNow || midnightNow || previewFireworksT > 0) && clock >= nextFirework {
+            launchRocket()
+            nextFirework = clock + ((midnightNow || previewFireworksT > 0)
+                ? CGFloat.random(in: 0.35...0.9) : CGFloat.random(in: 5...14))
+        }
+        i = 0
+        while i < rockets.count {
+            let r = rockets[i]
+            r.vy -= 330 * dt
+            r.position.x += r.vx * dt
+            r.position.y += r.vy * dt
+            spark(at: r.position, v: CGVector(dx: CGFloat.random(in: -15...15), dy: -30),
+                  color: Palette.c(1, 0.8, 0.45), size: 4, life: 0.4, gravity: 20)
+            if r.vy < 70 {
+                explode(at: r.position)
+                r.removeFromParent()
+                rockets.remove(at: i)
+                continue
+            }
+            i += 1
+        }
+
+        // Santa on Christmas Eve, with a trail of golden dust.
+        if let sl = sleigh {
+            sleighT += dt
+            sl.position.x -= 230 * dt
+            sl.position.y = sleighBaseY + sin(sleighT * 1.4) * 24
+            sl.zRotation = cos(sleighT * 1.4) * 0.05
+            sl.animate(dt: dt)
+            for _ in 0..<2 {
+                spark(at: CGPoint(x: sl.position.x + 46, y: sl.position.y + CGFloat.random(in: -6...6)),
+                      v: CGVector(dx: CGFloat.random(in: 10...50), dy: CGFloat.random(in: -20...10)),
+                      color: Bool.random() ? ItemArt.gold : .white, size: CGFloat.random(in: 3...6),
+                      life: CGFloat.random(in: 0.8...1.5), gravity: 15)
+            }
+            if sl.position.x < -280 {
+                sl.removeFromParent()
+                sleigh = nil
+            }
+        }
+        i = 0
+        while i < sparks.count {
+            let f = sparks[i]
+            f.vy -= f.term * dt
+            let damp = max(0, 1 - 1.1 * dt)
+            f.vx *= damp
+            f.vy *= damp
+            f.position.x += f.vx * dt
+            f.position.y += f.vy * dt
+            f.life -= dt
+            let twinkle: CGFloat = sin(clock * 28 + f.phase) > 0.2 ? 1 : 0.7
+            f.alpha = max(0, f.life / max(f.maxLife, 0.01)) * twinkle
+            if f.life <= 0 {
+                f.removeFromParent()
+                sparks.remove(at: i)
+                continue
+            }
+            i += 1
+        }
+
+        // Friends.
+        if let p = penguin {
+            p.update(dt: dt)
+            if p.state == .done {
+                p.removeFromParent()
+                penguin = nil
+                nextPenguin = clock + CGFloat.random(in: 160...320)
+            }
+        }
+        if let c = cardinal {
+            c.update(dt: dt, pointer: inBounds ? pointer : nil)
+            if c.state == .done {
+                c.removeFromParent()
+                cardinal = nil
+                nextCardinal = clock + CGFloat.random(in: 100...220)
+            }
+        }
+
+        // Snowball fight clock.
+        if var f = fight {
+            f.time -= dt
+            fight = f
+            scoreboard?.set(name: settings.displayName, her: f.her, yeti: f.yeti, secondsLeft: Int(ceil(max(0, f.time))))
+            if f.time <= 0 || f.her >= 7 || f.yeti >= 7 { finishFight() }
+        }
+
+        // Badges, one celebration at a time.
+        toastBusy -= dt
+        if toastBusy <= 0 && !badgeQueue.isEmpty { showToast(badgeQueue.removeFirst()) }
     }
 }

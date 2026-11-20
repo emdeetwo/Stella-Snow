@@ -7,6 +7,19 @@ struct SnowmanOutfit: Codable, Equatable {
     enum Hat: Int { case topHat = 0, beanie = 1, earmuffs = 2 }
     var scarf: Int
     var hat: Int
+    /// Closet items she has dressed him in (nil = his own).
+    var hatItem: Item? = nil
+    var faceItem: Item? = nil
+    var neckItem: Item? = nil
+
+    var effectiveHat: Item {
+        if let h = hatItem { return h }
+        switch Hat(rawValue: hat) ?? .topHat {
+        case .topHat: return .topHat
+        case .beanie: return .beanie
+        case .earmuffs: return .earmuffs
+        }
+    }
 
     static let classic = SnowmanOutfit(scarf: 0, hat: 0)
     static func random() -> SnowmanOutfit {
@@ -23,15 +36,15 @@ struct SnowmanOutfit: Codable, Equatable {
 final class SnowmanNode: SKNode {
     enum Mode { case idle, scattered, reassembling }
 
-    let outfit: SnowmanOutfit
+    private(set) var outfit: SnowmanOutfit
     private(set) var mode: Mode = .idle
     private(set) var figureScale: CGFloat = 1
     private weak var host: SnowScene?
 
     private final class Part {
         let node: SKNode
-        let home: CGPoint
-        let r: CGFloat
+        var home: CGPoint
+        var r: CGFloat
         var v = CGVector.zero
         var spin: CGFloat = 0
         var from = CGPoint.zero
@@ -52,6 +65,10 @@ final class SnowmanNode: SKNode {
     private let oMouth = Art.circle(4.2, Palette.coal, at: CGPoint(x: 0, y: -10))
     private let waveArm = SKNode()
     private let scarfTail = SKNode()
+    private let hatArt = SKNode()
+    private let faceArt = SKNode()
+    private let neckArt = SKNode()
+    private var partyHat = false
     private var hatOffset: CGFloat = 18
     private let hatTilt: CGFloat = 0.07
 
@@ -197,56 +214,108 @@ final class SnowmanNode: SKNode {
         oMouth.zPosition = 1
         head.addChild(oMouth)
 
-        // Hat, its own part so it can fly off.
+        // Hat, its own part so it can fly off. Face and neck items ride on
+        // the head and middle ball.
         let hat = SKNode()
         hat.zPosition = 3
-        var hatR: CGFloat = 6
-        switch SnowmanOutfit.Hat(rawValue: outfit.hat) ?? .topHat {
-        case .topHat:
-            hatOffset = 18
-            hat.addChild(Art.fill(Art.rect(-15, 0, 30, 31, radius: 2), Palette.hatBlack))
-            hat.addChild(Art.fill(Art.rect(-15, 2, 30, 6), scarfColor))
-            let shine = Art.fill(Art.rect(-11, 10, 3, 18, radius: 1.5), NSColor(white: 1, alpha: 0.18))
-            hat.addChild(shine)
-            hat.addChild(Art.ellipse(54, 10, Palette.hatBlack, at: CGPoint(x: 0, y: 1)))
-            hatR = 5
-        case .beanie:
-            hatOffset = 9
-            let dome = CGMutablePath()
-            dome.addArc(center: CGPoint(x: 0, y: 6), radius: 26, startAngle: 0, endAngle: .pi, clockwise: false)
-            dome.closeSubpath()
-            hat.addChild(Art.fill(dome, scarfColor))
-            let cuff = Art.fill(Art.rect(-28, -3, 56, 13, radius: 6), Palette.mix(scarfColor, .black, 0.18))
-            hat.addChild(cuff)
-            let ribs = CGMutablePath()
-            for i in 0..<9 {
-                let x = -22 + CGFloat(i) * 5.5
-                ribs.move(to: CGPoint(x: x, y: -1))
-                ribs.addLine(to: CGPoint(x: x, y: 8))
-            }
-            hat.addChild(Art.line(ribs, Palette.mix(scarfColor, .black, 0.32), width: 1.2))
-            hat.addChild(Art.sprite(Tex.fluff, 22, 22, at: CGPoint(x: 0, y: 34)))
-            hatR = 9
-        case .earmuffs:
-            hatOffset = 0
-            let band = CGMutablePath()
-            band.addArc(center: CGPoint(x: 0, y: 2), radius: 28,
-                        startAngle: .pi * 0.1, endAngle: .pi * 0.9, clockwise: false)
-            hat.addChild(Art.line(band, Palette.mix(Palette.hatBlack, .white, 0.25), width: 3.6))
-            for x: CGFloat in [-27, 27] {
-                hat.addChild(Art.sprite(Tex.fluff, 21, 21, at: CGPoint(x: x, y: -2), tint: scarfColor))
-            }
-            hatR = 10
-        }
+        hat.addChild(hatArt)
         rig.addChild(hat)
+        faceArt.position = CGPoint(x: 0, y: 6)
+        faceArt.zPosition = 2.5
+        head.addChild(faceArt)
+        neckArt.position = CGPoint(x: 0, y: 14)
+        neckArt.zPosition = 3
+        mid.addChild(neckArt)
 
         parts = [
             Part(node: bottom, home: bottom.position, r: 46),
             Part(node: mid, home: mid.position, r: 34),
             Part(node: head, home: head.position, r: 25),
-            Part(node: hat, home: CGPoint(x: 0, y: 142 + hatOffset), r: hatR),
+            Part(node: hat, home: CGPoint(x: 0, y: 142 + hatOffset), r: 6),
         ]
-        attachHat()
+        refreshOutfit()
+    }
+
+    /// Redraws the hat, glasses and neck pieces from the outfit.
+    private func refreshOutfit() {
+        hatArt.removeAllChildren()
+        let wanted = partyHat && outfit.hatItem == nil ? Item.partyHat : outfit.effectiveHat
+        let h = ItemArt.hat(wanted, scarf: scarfColor)
+        hatArt.addChild(h.node)
+        hatOffset = h.offset
+        parts[3].home = CGPoint(x: 0, y: 142 + hatOffset)
+        parts[3].r = h.radius
+        faceArt.removeAllChildren()
+        if let f = outfit.faceItem { faceArt.addChild(ItemArt.face(f)) }
+        nose.isHidden = outfit.faceItem == .rudolphNose
+        neckArt.removeAllChildren()
+        if let n = outfit.neckItem { neckArt.addChild(ItemArt.neck(n)) }
+        if mode == .idle { attachHat() }
+    }
+
+    // MARK: - dress-up
+
+    /// Puts a closet item on him. Returns what it replaced, if anything.
+    @discardableResult
+    func wear(_ item: Item) -> Item? {
+        var old: Item?
+        switch item.slot {
+        case .hat:
+            old = outfit.hatItem
+            outfit.hatItem = item
+        case .face:
+            old = outfit.faceItem
+            outfit.faceItem = item
+        case .neck:
+            old = outfit.neckItem
+            outfit.neckItem = item
+        case .decor:
+            return nil
+        }
+        refreshOutfit()
+        squashVel += 6
+        return old
+    }
+
+    /// Takes off whatever closet item is under the pointer, if any.
+    func takeOff(at p: CGPoint) -> Item? {
+        guard mode == .idle, let host = host else { return nil }
+        let checks: [(Item?, SKNode, Item.Slot)] = [
+            (outfit.faceItem, faceArt, .face), (outfit.neckItem, neckArt, .neck), (outfit.hatItem, hatArt, .hat),
+        ]
+        for (item, node, slot) in checks {
+            guard let item = item, let parent = node.parent else { continue }
+            let f = node.calculateAccumulatedFrame().insetBy(dx: -8, dy: -8)
+            let a = host.convert(CGPoint(x: f.minX, y: f.minY), from: parent)
+            let b = host.convert(CGPoint(x: f.maxX, y: f.maxY), from: parent)
+            let r = CGRect(x: min(a.x, b.x), y: min(a.y, b.y), width: abs(b.x - a.x), height: abs(b.y - a.y))
+            if r.contains(p) {
+                switch slot {
+                case .hat: outfit.hatItem = nil
+                case .face: outfit.faceItem = nil
+                case .neck: outfit.neckItem = nil
+                case .decor: break
+                }
+                refreshOutfit()
+                return item
+            }
+        }
+        return nil
+    }
+
+    /// Where a dropped item should land to count as "on" him.
+    func catches(_ p: CGPoint) -> Bool {
+        guard mode == .idle, !isHidden else { return false }
+        let s = figureScale
+        let dx = (p.x - position.x) / (70 * s), dy = (p.y - (position.y + 110 * s)) / (110 * s)
+        return dx * dx + dy * dy <= 1
+    }
+
+    /// Birthday: a party hat for the day (unless she picked another).
+    func setPartyHat(_ on: Bool) {
+        guard partyHat != on else { return }
+        partyHat = on
+        refreshOutfit()
     }
 
     private func attachHat() {
@@ -296,6 +365,7 @@ final class SnowmanNode: SKNode {
                 host.burst(at: tip, count: 28, spread: 200)
             }
             say("Achoo!")
+            SnowProgress.shared.bump(.sneezes)
         } else if pokes == 1 && Int.random(in: 0..<3) == 0 {
             say(["Hee hee!", "That tickles!", "Brrr!"].randomElement() ?? "Hee hee!")
         }

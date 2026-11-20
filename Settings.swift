@@ -65,6 +65,18 @@ final class SnowController {
     func summonYeti() { scene?.summonYeti() }
     func starterBall() { scene?.spawnStarterBall() }
     func blizzard() { scene?.startBlizzard() }
+    func closet() { scene?.toggleCloset() }
+
+    // Sneak peeks (hold Option while opening the menu).
+    func peekPresent() { scene?.previewPresent() }
+    func peekSleigh() { scene?.previewSleigh() }
+    func peekFireworks() { scene?.previewFireworks() }
+    func peekBirthday() { scene?.previewBirthday() }
+    func peekFrost() { scene?.previewFrost() }
+    func peekGlobe() { scene?.previewGlobe() }
+    func peekPenguin() { scene?.previewPenguin() }
+    func peekCardinal() { scene?.previewCardinal() }
+    func peekFight() { scene?.previewFight() }
 }
 
 /// The house picture (the video's first frame) becomes the real macOS

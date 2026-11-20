@@ -18,9 +18,14 @@
 		B10000000000000000000012 /* WindowTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000011 /* WindowTracker.swift */; };
 		B10000000000000000000014 /* Textures.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000013 /* Textures.swift */; };
 		B10000000000000000000016 /* Art.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000015 /* Art.swift */; };
-		B10000000000000000000018 /* Wallpaper.jpg in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000017 /* Wallpaper.jpg */; };
-		B1000000000000000000001A /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000019 /* AppIcon.icns */; };
-		B1000000000000000000001C /* HouseLoop.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001B /* HouseLoop.mp4 */; };
+		B10000000000000000000018 /* Progress.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000017 /* Progress.swift */; };
+		B1000000000000000000001A /* Accessories.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000019 /* Accessories.swift */; };
+		B1000000000000000000001C /* Festive.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001B /* Festive.swift */; };
+		B1000000000000000000001E /* Frost.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001D /* Frost.swift */; };
+		B10000000000000000000020 /* Friends.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001F /* Friends.swift */; };
+		B10000000000000000000022 /* Wallpaper.jpg in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000021 /* Wallpaper.jpg */; };
+		B10000000000000000000024 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000023 /* AppIcon.icns */; };
+		B10000000000000000000026 /* HouseLoop.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000025 /* HouseLoop.mp4 */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -35,15 +40,20 @@
 		A10000000000000000000011 /* WindowTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowTracker.swift; sourceTree = "<group>"; };
 		A10000000000000000000013 /* Textures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Textures.swift; sourceTree = "<group>"; };
 		A10000000000000000000015 /* Art.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Art.swift; sourceTree = "<group>"; };
-		A10000000000000000000017 /* Wallpaper.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = Wallpaper.jpg; sourceTree = "<group>"; };
-		A10000000000000000000019 /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
-		A1000000000000000000001B /* HouseLoop.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = HouseLoop.mp4; sourceTree = "<group>"; };
-		A1000000000000000000001D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		A1000000000000000000001E /* StellaSnow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = StellaSnow.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000000000000000000017 /* Progress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Progress.swift; sourceTree = "<group>"; };
+		A10000000000000000000019 /* Accessories.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Accessories.swift; sourceTree = "<group>"; };
+		A1000000000000000000001B /* Festive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Festive.swift; sourceTree = "<group>"; };
+		A1000000000000000000001D /* Frost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Frost.swift; sourceTree = "<group>"; };
+		A1000000000000000000001F /* Friends.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Friends.swift; sourceTree = "<group>"; };
+		A10000000000000000000021 /* Wallpaper.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = Wallpaper.jpg; sourceTree = "<group>"; };
+		A10000000000000000000023 /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
+		A10000000000000000000025 /* HouseLoop.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = HouseLoop.mp4; sourceTree = "<group>"; };
+		A10000000000000000000027 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A10000000000000000000028 /* StellaSnow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = StellaSnow.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		D10000000000000000000022 /* Frameworks */ = {
+		D1000000000000000000002C /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -53,7 +63,7 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		C1000000000000000000001F = {
+		C10000000000000000000029 = {
 			isa = PBXGroup;
 			children = (
 				A10000000000000000000001 /* StellaSnowApp.swift */,
@@ -67,18 +77,23 @@
 				A10000000000000000000011 /* WindowTracker.swift */,
 				A10000000000000000000013 /* Textures.swift */,
 				A10000000000000000000015 /* Art.swift */,
-				A10000000000000000000017 /* Wallpaper.jpg */,
-				A10000000000000000000019 /* AppIcon.icns */,
-				A1000000000000000000001B /* HouseLoop.mp4 */,
-				A1000000000000000000001D /* Info.plist */,
-				C10000000000000000000020 /* Products */,
+				A10000000000000000000017 /* Progress.swift */,
+				A10000000000000000000019 /* Accessories.swift */,
+				A1000000000000000000001B /* Festive.swift */,
+				A1000000000000000000001D /* Frost.swift */,
+				A1000000000000000000001F /* Friends.swift */,
+				A10000000000000000000021 /* Wallpaper.jpg */,
+				A10000000000000000000023 /* AppIcon.icns */,
+				A10000000000000000000025 /* HouseLoop.mp4 */,
+				A10000000000000000000027 /* Info.plist */,
+				C1000000000000000000002A /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		C10000000000000000000020 /* Products */ = {
+		C1000000000000000000002A /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				A1000000000000000000001E /* StellaSnow.app */,
+				A10000000000000000000028 /* StellaSnow.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -86,13 +101,13 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		E10000000000000000000024 /* StellaSnow */ = {
+		E1000000000000000000002E /* StellaSnow */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = F10000000000000000000027 /* Build configuration list for PBXNativeTarget "StellaSnow" */;
+			buildConfigurationList = F10000000000000000000031 /* Build configuration list for PBXNativeTarget "StellaSnow" */;
 			buildPhases = (
-				D10000000000000000000021 /* Sources */,
-				D10000000000000000000022 /* Frameworks */,
-				D10000000000000000000023 /* Resources */,
+				D1000000000000000000002B /* Sources */,
+				D1000000000000000000002C /* Frameworks */,
+				D1000000000000000000002D /* Resources */,
 			);
 			buildRules = (
 			);
@@ -100,25 +115,25 @@
 			);
 			name = StellaSnow;
 			productName = StellaSnow;
-			productReference = A1000000000000000000001E /* StellaSnow.app */;
+			productReference = A10000000000000000000028 /* StellaSnow.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		E10000000000000000000025 /* Project object */ = {
+		E1000000000000000000002F /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1600;
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
-					E10000000000000000000024 = {
+					E1000000000000000000002E = {
 						CreatedOnToolsVersion = 16.0;
 					};
 				};
 			};
-			buildConfigurationList = F10000000000000000000026 /* Build configuration list for PBXProject "StellaSnow" */;
+			buildConfigurationList = F10000000000000000000030 /* Build configuration list for PBXProject "StellaSnow" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -126,31 +141,31 @@
 				en,
 				Base,
 			);
-			mainGroup = C1000000000000000000001F;
-			productRefGroup = C10000000000000000000020 /* Products */;
+			mainGroup = C10000000000000000000029;
+			productRefGroup = C1000000000000000000002A /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				E10000000000000000000024 /* StellaSnow */,
+				E1000000000000000000002E /* StellaSnow */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		D10000000000000000000023 /* Resources */ = {
+		D1000000000000000000002D /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				B10000000000000000000018 /* Wallpaper.jpg in Resources */,
-				B1000000000000000000001A /* AppIcon.icns in Resources */,
-				B1000000000000000000001C /* HouseLoop.mp4 in Resources */,
+				B10000000000000000000022 /* Wallpaper.jpg in Resources */,
+				B10000000000000000000024 /* AppIcon.icns in Resources */,
+				B10000000000000000000026 /* HouseLoop.mp4 in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		D10000000000000000000021 /* Sources */ = {
+		D1000000000000000000002B /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -165,13 +180,18 @@
 				B10000000000000000000012 /* WindowTracker.swift in Sources */,
 				B10000000000000000000014 /* Textures.swift in Sources */,
 				B10000000000000000000016 /* Art.swift in Sources */,
+				B10000000000000000000018 /* Progress.swift in Sources */,
+				B1000000000000000000001A /* Accessories.swift in Sources */,
+				B1000000000000000000001C /* Festive.swift in Sources */,
+				B1000000000000000000001E /* Frost.swift in Sources */,
+				B10000000000000000000020 /* Friends.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		F10000000000000000000028 /* Debug */ = {
+		F10000000000000000000032 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -188,7 +208,7 @@
 			};
 			name = Debug;
 		};
-		F10000000000000000000029 /* Release */ = {
+		F10000000000000000000033 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -204,7 +224,7 @@
 			};
 			name = Release;
 		};
-		F1000000000000000000002A /* Debug */ = {
+		F10000000000000000000034 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "-";
@@ -227,7 +247,7 @@
 			};
 			name = Debug;
 		};
-		F1000000000000000000002B /* Release */ = {
+		F10000000000000000000035 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "-";
@@ -253,25 +273,25 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		F10000000000000000000026 /* Build configuration list for PBXProject "StellaSnow" */ = {
+		F10000000000000000000030 /* Build configuration list for PBXProject "StellaSnow" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				F10000000000000000000028 /* Debug */,
-				F10000000000000000000029 /* Release */,
+				F10000000000000000000032 /* Debug */,
+				F10000000000000000000033 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		F10000000000000000000027 /* Build configuration list for PBXNativeTarget "StellaSnow" */ = {
+		F10000000000000000000031 /* Build configuration list for PBXNativeTarget "StellaSnow" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				F1000000000000000000002A /* Debug */,
-				F1000000000000000000002B /* Release */,
+				F10000000000000000000034 /* Debug */,
+				F10000000000000000000035 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = E10000000000000000000025 /* Project object */;
+	rootObject = E1000000000000000000002F /* Project object */;
 }

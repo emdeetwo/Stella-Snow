@@ -12,7 +12,10 @@ import AppKit
 /// Every move has anticipation (lean back), action, and follow-through, so
 /// he reads like a cartoon instead of a sliding sticker.
 final class YetiNode: SKNode {
-    enum Beat { case away, walkIn, sneak, windup, shove, laugh, scoop, aim, release, wave, walkOut, bonked }
+    enum Beat {
+        case away, walkIn, sneak, windup, shove, laugh, scoop, aim, release, wave, walkOut, bonked
+        case fightReady, ouch, hide, cower, giveCake
+    }
 
     private weak var host: SnowScene?
     private(set) var beat: Beat = .away
@@ -40,6 +43,15 @@ final class YetiNode: SKNode {
     private let brows = SKNode()
 
     var isAway: Bool { beat == .away }
+    /// In a snowball fight with her right now.
+    private(set) var fighting = false
+    private var foughtThisVisit = false
+    /// Sneak peek: start a fight the moment he arrives.
+    var fightOnArrival = false
+    /// Her birthday: he brings a cake instead of causing trouble.
+    var birthdayVisit = false
+    private var hideX: CGFloat = 0
+    private let cake = SKNode()
 
     init(host: SnowScene) {
         self.host = host
@@ -48,6 +60,13 @@ final class YetiNode: SKNode {
         addChild(shadowSprite)
         addChild(rig)
         build()
+        let cakeArt = ItemArt.decor(.birthdayCake)
+        cakeArt.setScale(0.75)
+        cake.addChild(cakeArt)
+        cake.position = CGPoint(x: 44, y: 66)
+        cake.zPosition = 5.5
+        cake.isHidden = true
+        rig.addChild(cake)
         isHidden = true
     }
 
@@ -184,19 +203,46 @@ final class YetiNode: SKNode {
         if beat == .away { awayTimer = 0.3 }
     }
 
+    /// Hiding behind a snowman, he can't be hit (the snowman takes it).
     func hit(_ p: CGPoint) -> Bool {
-        guard !isHidden, beat != .away, beat != .bonked else { return false }
+        guard !isHidden, beat != .away, beat != .bonked, beat != .cower, beat != .hide else { return false }
         return abs(p.x - position.x) < 52 && p.y > position.y - 6 && p.y < position.y + 172
     }
 
-    /// Stella got him. He drops everything and runs.
+    /// She got him with a snowball. The first hit of a visit starts a
+    /// snowball fight; hits during the fight score; after that he runs.
     func bonk() {
         guard beat != .away, beat != .bonked else { return }
+        SnowProgress.shared.bump(.yetiHits)
+        if fighting {
+            held.isHidden = true
+            host?.yetiWasHit()
+            host?.burst(at: CGPoint(x: position.x, y: position.y + 120), count: 16, spread: 170)
+            setBeat(.ouch)
+            return
+        }
+        if beat != .walkOut && beat != .giveCake && !foughtThisVisit, host?.startFight() == true {
+            fighting = true
+            foughtThisVisit = true
+            held.isHidden = true
+            host?.burst(at: CGPoint(x: position.x, y: position.y + 120), count: 16, spread: 170)
+            host?.say("Oh, it's ON!", at: CGPoint(x: position.x + 20, y: position.y + 182))
+            setBeat(.ouch)
+            return
+        }
         held.isHidden = true
         setBeat(.bonked)
         host?.burst(at: CGPoint(x: position.x, y: position.y + 120), count: 22, spread: 200)
         host?.say(["Eep!", "No fair!", "You got me!"].randomElement() ?? "Eep!",
                   at: CGPoint(x: position.x + 20, y: position.y + 182))
+    }
+
+    /// The scene calls this when the fight's time is up.
+    func endFight() {
+        guard fighting else { return }
+        fighting = false
+        held.isHidden = true
+        setBeat(.wave)
     }
 
     private func setBeat(_ b: Beat) {
@@ -220,6 +266,8 @@ final class YetiNode: SKNode {
         }
         if !enabled && beat != .walkOut && beat != .bonked && beat != .away {
             held.isHidden = true
+            cake.isHidden = true
+            if fighting { fighting = false; host?.forfeitFight() }
             setBeat(.walkOut)
         }
 
@@ -243,6 +291,8 @@ final class YetiNode: SKNode {
                 facing = 1
                 position.x = -150
                 walkSpeed = 70
+                foughtThisVisit = false
+                cake.isHidden = !birthdayVisit
                 setBeat(.walkIn)
             }
             return
@@ -260,7 +310,19 @@ final class YetiNode: SKNode {
             crouch = 0.95 + sin(beatT * 9) * 0.01
             happy = true
             bob = sin(beatT * 9) * 1.2
-            if beatT > 1.0 { setBeat(snowmanX == nil ? .scoop : .windup) }
+            if beatT > 1.0 {
+                if birthdayVisit {
+                    setBeat(.giveCake)
+                } else if fightOnArrival, host?.startFight() == true {
+                    fightOnArrival = false
+                    fighting = true
+                    foughtThisVisit = true
+                    host?.say("Snowball fight!", at: CGPoint(x: position.x + 20, y: position.y + 182))
+                    setBeat(.fightReady)
+                } else {
+                    setBeat(snowmanX == nil ? .scoop : .windup)
+                }
+            }
 
         case .windup:
             let u = min(1, beatT / 0.45)
@@ -318,10 +380,68 @@ final class YetiNode: SKNode {
             back = 0.4
             if !held.isHidden && beatT > 0.04 {
                 held.isHidden = true
-                host?.throwAtGlass(from: handInScene)
+                host?.throwAtGlass(from: handInScene, target: fighting ? host?.fightThrowTarget() : nil)
                 throwsLeft -= 1
             }
-            if beatT > 0.3 { setBeat(throwsLeft > 0 ? .scoop : .wave) }
+            if beatT > 0.3 { setBeat(fighting ? .fightReady : (throwsLeft > 0 ? .scoop : .wave)) }
+
+        case .fightReady:
+            happy = true
+            bob = abs(sin(beatT * 10)) * 4
+            front = 0.4
+            back = 0.3
+            if beatT > 0.55 + CGFloat(Int(clock * 7) % 5) * 0.12 { setBeat(.scoop) }
+
+        case .ouch:
+            lean = 0.26
+            crouch = 0.92
+            front = 2.2
+            back = -0.8
+            eyes.yScale = 0.3
+            if beatT > 0.5 {
+                if Bool.random(), let x = host?.coverX(near: position.x) {
+                    hideX = x
+                    walkSpeed = 150
+                    setBeat(.hide)
+                } else {
+                    setBeat(.fightReady)
+                }
+            }
+
+        case .hide:
+            let dx = hideX - position.x
+            if abs(dx) < 6 {
+                setBeat(.cower)
+            } else {
+                walk(dt, dir: dx > 0 ? 1 : -1)
+                bob = abs(sin(walkPhase)) * 6
+                front = -sin(walkPhase) * 0.8
+                back = sin(walkPhase) * 0.8
+            }
+
+        case .cower:
+            crouch = 0.68
+            bob = sin(beatT * 30) * 0.8
+            front = 2.7
+            back = 2.5
+            if beatT > 1.6 {
+                facing = 1
+                setBeat(.fightReady)
+            }
+
+        case .giveCake:
+            front = 1.45
+            back = 1.35
+            happy = true
+            if beatT > 1.3 && !cake.isHidden {
+                cake.isHidden = true
+                host?.placeCake(x: position.x + 72 * facing)
+            }
+            if beatT > 2.0 {
+                birthdayVisit = false
+                host?.say("Happy birthday!", at: CGPoint(x: position.x + 20, y: position.y + 182))
+                setBeat(.wave)
+            }
 
         case .wave:
             happy = true
@@ -349,7 +469,8 @@ final class YetiNode: SKNode {
             }
         }
 
-        if beat != .walkIn && beat != .walkOut && beat != .bonked {
+        zPosition = (beat == .hide || beat == .cower) ? 6.5 : 8
+        if beat != .walkIn && beat != .walkOut && beat != .bonked && beat != .hide {
             legL.position.y += (22 - legL.position.y) * min(1, 12 * dt)
             legR.position.y += (22 - legR.position.y) * min(1, 12 * dt)
         }
@@ -365,7 +486,7 @@ final class YetiNode: SKNode {
         brows.position.y = happy ? 13 : 11
 
         // Eyes look at you (the camera) while scheming, otherwise ahead.
-        let lookCamera = beat == .sneak || beat == .aim || beat == .wave || beat == .laugh
+        let lookCamera = beat == .sneak || beat == .aim || beat == .wave || beat == .laugh || beat == .fightReady || beat == .giveCake
         var ex: CGFloat = lookCamera ? 0 : 3
         if let p = pointer, beat == .walkIn {
             ex = clamp((p.x - position.x) / 300, -3, 3) * facing

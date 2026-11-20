@@ -4,9 +4,11 @@ import AppKit
 /// The menu bar popover.
 struct ControlsView: View {
     @EnvironmentObject var settings: SnowSettings
+    @ObservedObject private var progress = SnowProgress.shared
     @State private var loginOn = LoginItem.isEnabled
     @State private var loginFailed = false
     @State private var showHelp = false
+    @State private var showPeeks = false
 
     private var title: String {
         settings.displayName.isEmpty ? "Snow Day" : "\(settings.displayName)'s Snow"
@@ -23,8 +25,32 @@ struct ControlsView: View {
     }
 
     var body: some View {
+        ScrollView {
+            content
+        }
+        .frame(height: 640)
+        .onAppear { showPeeks = NSEvent.modifierFlags.contains(.option) }
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 14) {
             header
+
+            HStack(spacing: 8) {
+                Image(systemName: "gift.fill")
+                    .frame(width: 18)
+                    .foregroundStyle(Color(red: 0.86, green: 0.14, blue: 0.19))
+                Text(Holiday.countdownLine(name: settings.displayName))
+                    .font(.callout.weight(.semibold))
+                Spacer()
+                if Holiday.month == 12 {
+                    Text("\(progress.openedDays.count)/25 gifts")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            }
 
             MenuSection("Weather") {
                 SliderRow(icon: "cloud.snow", title: "Snowfall", value: $settings.snowfall, range: 0...600, step: 10,
@@ -43,6 +69,7 @@ struct ControlsView: View {
                     ActionButton(icon: "circle.fill", title: "Snowball") { SnowController.shared.starterBall() }
                     ActionButton(icon: "car.fill", title: "Snowplough") { SnowController.shared.plough() }
                 }
+                ActionButton(icon: "tshirt.fill", title: "Open the closet") { SnowController.shared.closet() }
                 SwitchRow(icon: "hand.tap", title: "Click the desktop to throw", isOn: $settings.clickSnowballs)
             }
 
@@ -53,6 +80,36 @@ struct ControlsView: View {
                     Button("Call him") { SnowController.shared.summonYeti() }
                         .controlSize(.small)
                         .disabled(!settings.yetiEnabled)
+                }
+            }
+
+            MenuSection("Badges  \(progress.earned.count) of \(Badge.all.count)") {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 6), spacing: 6) {
+                    ForEach(Badge.all) { badge in
+                        let got = progress.earned.contains(badge.id)
+                        Image(systemName: badge.symbol)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(got ? Color.white : Color.secondary)
+                            .frame(width: 34, height: 34)
+                            .background(Circle().fill(got ? Color(red: 0.95, green: 0.72, blue: 0.15) : Color.gray.opacity(0.18)))
+                            .help(got ? "\(badge.title): \(badge.detail)" : "Locked: \(badge.detail)")
+                    }
+                }
+            }
+
+            if showPeeks {
+                MenuSection("Sneak peeks") {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
+                        PeekButton(title: "Present") { SnowController.shared.peekPresent() }
+                        PeekButton(title: "Sleigh") { SnowController.shared.peekSleigh() }
+                        PeekButton(title: "Fireworks") { SnowController.shared.peekFireworks() }
+                        PeekButton(title: "Birthday") { SnowController.shared.peekBirthday() }
+                        PeekButton(title: "Frost") { SnowController.shared.peekFrost() }
+                        PeekButton(title: "Globe") { SnowController.shared.peekGlobe() }
+                        PeekButton(title: "Penguin") { SnowController.shared.peekPenguin() }
+                        PeekButton(title: "Cardinal") { SnowController.shared.peekCardinal() }
+                        PeekButton(title: "Fight") { SnowController.shared.peekFight() }
+                    }
                 }
             }
 
@@ -94,7 +151,11 @@ struct ControlsView: View {
                     HelpLine("Drag a snowman off the edge of the screen to say goodbye.")
                     HelpLine("Click the snowman to say hi. Click him three times fast.")
                     HelpLine("Snow piles up on your windows. Close one and watch.")
-                    HelpLine("Click the yeti to get him back. Click a splat to wipe it off.")
+                    HelpLine("Click the yeti to start a snowball fight. He throws back at your pointer, so dodge! Click a splat to wipe it off.")
+                    HelpLine("In December, a present waits on the snow every day. Click it to unwrap.")
+                    HelpLine("Click the wooden trunk to open the closet. Drag hats, glasses and bow ties onto any snowman.")
+                    HelpLine("Shake the pointer back and forth fast for a snow globe.")
+                    HelpLine("Leave the Mac alone and frost creeps onto the glass. Draw in it with the pointer.")
                 }
                 .padding(.top, 6)
             } label: {
@@ -215,6 +276,18 @@ private struct ActionButton: View {
         }
         .buttonStyle(.bordered)
         .controlSize(.regular)
+    }
+}
+
+private struct PeekButton: View {
+    let title: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(title, action: action)
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .frame(maxWidth: .infinity)
     }
 }
 
